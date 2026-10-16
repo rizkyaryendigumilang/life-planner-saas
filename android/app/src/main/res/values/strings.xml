@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Life Planner</string>
+    <string name="title_activity_main">Life Planner</string>
+    <string name="package_name">com.lifeplanner.app</string>
+    <string name="custom_url_scheme">com.lifeplanner.app</string>
+</resources>

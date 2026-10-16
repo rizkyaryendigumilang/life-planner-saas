@@ -1,0 +1,138 @@
+name: Build Mobile Apps (APK & IPA) and Sync to VPS
+
+on:
+  workflow_dispatch: # Memungkinkan trigger manual dari tab Actions di GitHub
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+
+jobs:
+  # ==========================================
+  # 1. BUILD ANDROID (.APK) - RUN ON UBUNTU
+  # ==========================================
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Sync to Capacitor Android
+        run: npx cap sync android
+
+      - name: Build Android APK (Debug)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Rename APK File
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk app-latest.apk
+
+      - name: Upload APK to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-latest-android-apk
+          path: app-latest.apk
+          retention-days: 14
+
+      - name: Transfer APK to VPS via SCP
+        if: ${{ env.VPS_HOST != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: 'app-latest.apk'
+          target: ${{ secrets.VPS_TARGET_DIR || '/var/www/downloads' }}
+
+  # ==========================================
+  # 2. BUILD IOS (.IPA) - RUN ON MACOS CLOUD
+  # ==========================================
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-14
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Sync to Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Build iOS Archive (Unsigned)
+        run: |
+          xcodebuild -workspace ios/App/App.xcworkspace \
+                     -scheme App \
+                     -configuration Release \
+                     -destination 'generic/platform=iOS' \
+                     -archivePath build/App.xcarchive \
+                     archive \
+                     CODE_SIGNING_ALLOWED=NO \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGN_IDENTITY=""
+
+      - name: Package .xcarchive into .ipa
+        run: |
+          mkdir -p build/Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+          cd build
+          zip -r ../app-latest.ipa Payload
+
+      - name: Upload IPA to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-latest-ios-ipa
+          path: app-latest.ipa
+          retention-days: 14
+
+      - name: Transfer IPA to VPS via SCP
+        if: ${{ env.VPS_HOST != '' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: 'app-latest.ipa'
+          target: ${{ secrets.VPS_TARGET_DIR || '/var/www/downloads' }}
