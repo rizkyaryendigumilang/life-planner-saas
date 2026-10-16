@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    /* Channel triplets so Tailwind can apply /opacity modifiers. */
+    --c-canvas: 255 255 255;
+    --c-surface: 255 255 255;
+    --c-muted: 245 245 246;
+    --c-ink: 23 23 27;
+    --c-ink-soft: 108 108 117;
+    --c-ink-faint: 150 150 160;
+    --c-line: 16 16 20;
+    --c-accent: 23 23 27;
+    --c-accent-ink: 255 255 255;
+    --c-positive: 5 122 85;
+    --c-caution: 176 82 8;
+    --c-negative: 185 28 28;
+    --c-data-1: 37 99 235;
+    --c-data-2: 5 150 105;
+    --c-data-3: 202 110 6;
+    --c-data-4: 225 29 72;
+    --c-data-5: 124 58 237;
+    --c-data-6: 8 145 178;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --c-canvas: 9 9 11;
+    --c-surface: 17 17 20;
+    --c-muted: 27 27 32;
+    --c-ink: 244 244 245;
+    --c-ink-soft: 161 161 170;
+    --c-ink-faint: 113 113 122;
+    --c-line: 255 255 255;
+    --c-accent: 244 244 245;
+    --c-accent-ink: 17 17 20;
+    --c-positive: 52 199 123;
+    --c-caution: 245 158 11;
+    --c-negative: 248 113 113;
+    --c-data-1: 96 165 250;
+    --c-data-2: 52 211 153;
+    --c-data-3: 251 191 36;
+    --c-data-4: 251 113 133;
+    --c-data-5: 167 139 250;
+    --c-data-6: 34 211 238;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    min-width: 320px;
+    background-color: rgb(var(--c-canvas));
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: rgb(var(--c-canvas));
+    color: rgb(var(--c-ink));
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* Prevent iPhone (iOS Safari) auto-zoom on input focus: font size must be at least 16px */
+  @media screen and (max-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-ink) / 0.45);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgb(var(--c-ink) / 0.14);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--c-ink-faint));
+  }
+}
+
+@layer components {
+  .page-title {
+    @apply text-2xl font-semibold tracking-[-.02em] text-ink sm:text-[28px];
+  }
+  /* A hairline border that stays visible in both themes without shouting. */
+  .surface {
+    @apply rounded-xl border border-line/10 bg-surface;
+  }
+  .soft-pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line/10 px-2.5 py-1 text-[11px] font-medium text-ink-soft;
+  }
+  /* Brand mark styling */
+  .brand-mark {
+    display: inline-block;
+    height: var(--mark-h, 20px);
+    width: auto;
+    object-fit: contain;
+  }
+  .brand-mark-lg {
+    --mark-h: 28px;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.26s ease-out both;
+}
+.dialog-backdrop {
+  background: rgb(9 9 11 / 0.45);
+  backdrop-filter: blur(6px);
+}
+.dialog-scroll {
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-line) / 0.16);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-line) / 0.28);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
