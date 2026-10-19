@@ -63,7 +63,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer APK to VPS via SCP
-        if: ${{ env.VPS_HOST != '' }}
+        if: false
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -134,7 +134,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer IPA to VPS via SCP
-        if: ${{ env.VPS_HOST != '' }}
+        if: false
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
