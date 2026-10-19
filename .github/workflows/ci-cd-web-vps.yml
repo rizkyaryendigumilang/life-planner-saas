@@ -1,0 +1,130 @@
+name: Web CI/CD to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'scripts/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'scripts/**'
+      - '.github/workflows/ci-cd-web-vps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: life-planner-web-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Validate and build web app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build production web bundle
+        env:
+          VITE_POCKETBASE_URL: ${{ secrets.VITE_POCKETBASE_URL }}
+        run: npm run typecheck && npm run build -- --base=/life-planner/
+      - name: Validate build output
+        run: |
+          set -euo pipefail
+          test -s dist/index.html
+          grep -q '/life-planner/assets/' dist/index.html
+      - name: Package web artifact
+        run: tar -czf web-dist.tar.gz -C dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: life-planner-web-dist
+          path: web-dist.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy-production:
+    name: Deploy web to production VPS
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: life-planner-web-dist
+          path: ./artifact
+      - name: Configure verified SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USERNAME }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$VPS_HOST" || { echo "Missing secret VPS_HOST"; exit 1; }
+          test -n "$VPS_USER" || { echo "Missing secret VPS_USERNAME"; exit 1; }
+          test -n "$VPS_KEY" || { echo "Missing secret VPS_SSH_KEY"; exit 1; }
+          test -n "$VPS_SSH_KNOWN_HOSTS" || { echo "Missing secret VPS_SSH_KNOWN_HOSTS (verified host key required)"; exit 1; }
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] && ((VPS_PORT > 0 && VPS_PORT < 65536)) || { echo "Invalid VPS_PORT"; exit 1; }
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Upload validated bundle
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USERNAME }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+        run: |
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -P "$VPS_PORT" ./artifact/web-dist.tar.gz "$VPS_USER@$VPS_HOST:web-dist-${GITHUB_SHA}.tar.gz"
+      - name: Deploy with backup and rollback
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USERNAME }}
+          VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "bash -s -- '/srv/www/life-planner' 'life-planner' '${GITHUB_SHA}'" <<'REMOTE'
+          set -Eeuo pipefail
+          live="$1"
+          slug="$2"
+          release="$3"
+          [[ "$release" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          test -d "$live" && test ! -L "$live" || { echo "Target must be an existing real directory: $live"; exit 1; }
+          parent="$HOME/.deploy-$slug"
+          stage="$parent/stage-$release"
+          backup="$parent/backup-$release.tar.gz"
+          mkdir -p "$parent"
+          test ! -e "$stage" && test ! -e "$backup"
+          mkdir "$stage"
+          trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$backup" ]; then mkdir -p "$stage/restore"; tar -xzf "$backup" -C "$stage/restore"; rsync -a --delete "$stage/restore/" "$live/"; fi; rm -rf "$stage"; exit "$status"' ERR
+          tar -xzf "$HOME/web-dist-$release.tar.gz" -C "$stage"
+          test -s "$stage/index.html"
+          tar -czf "$backup" -C "$live" .
+          rsync -a --delete "$stage/" "$live/"
+          test -s "$live/index.html"
+          rm -f "$HOME/web-dist-$release.tar.gz"
+          rm -rf "$stage"
+          trap - ERR
+          echo "Deployment successful to $live; rollback archive: $backup"
+          REMOTE
