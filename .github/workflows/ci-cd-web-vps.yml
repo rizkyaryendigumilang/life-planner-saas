@@ -45,9 +45,11 @@ jobs:
         run: npm ci
       - name: Build production web bundle
         env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_POCKETBASE_URL: ${{ secrets.VITE_POCKETBASE_URL }}
         run: |
           set -euo pipefail
+          test -n "$VITE_API_BASE_URL" || { echo "Missing VITE_API_BASE_URL secret"; exit 1; }
           test -n "$VITE_POCKETBASE_URL" || { echo "Missing VITE_POCKETBASE_URL secret"; exit 1; }
           npm run typecheck
           npm run build -- --base=/life-planner/
