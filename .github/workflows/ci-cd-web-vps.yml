@@ -46,7 +46,11 @@ jobs:
       - name: Build production web bundle
         env:
           VITE_POCKETBASE_URL: ${{ secrets.VITE_POCKETBASE_URL }}
-        run: npm run typecheck && npm run build -- --base=/life-planner/
+        run: |
+          set -euo pipefail
+          test -n "$VITE_POCKETBASE_URL" || { echo "Missing VITE_POCKETBASE_URL secret"; exit 1; }
+          npm run typecheck
+          npm run build -- --base=/life-planner/
       - name: Validate build output
         run: |
           set -euo pipefail
@@ -63,7 +67,7 @@ jobs:
 
   deploy-production:
     name: Deploy web to production VPS
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     needs: build
     runs-on: ubuntu-latest
     steps:
