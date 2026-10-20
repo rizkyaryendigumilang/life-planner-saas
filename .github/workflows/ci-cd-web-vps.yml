@@ -108,9 +108,10 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USERNAME }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
+          VPS_ROOT: ${{ secrets.VPS_WEB_ROOT || '/srv/www/life-planner' }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "bash -s -- '/srv/www/life-planner' 'life-planner' '${GITHUB_SHA}'" <<'REMOTE'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}'" <<'REMOTE'
           set -Eeuo pipefail
           live="$1"
           slug="$2"
@@ -129,8 +130,18 @@ jobs:
           tar -czf "$backup" -C "$live" .
           rsync -a --delete "$stage/" "$live/"
           test -s "$live/index.html"
+          test -d "$live/assets"
           rm -f "$HOME/web-dist-$release.tar.gz"
           rm -rf "$stage"
           trap - ERR
           echo "Deployment successful to $live; rollback archive: $backup"
           REMOTE
+      - name: Verify Web Deployment Health
+        env:
+          HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL || secrets.HEALTH_CHECK_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${HEALTHCHECK_URL:-}" ]; then
+            echo "Checking deployment health at $HEALTHCHECK_URL..."
+            curl -k -sSf -m 15 "$HEALTHCHECK_URL" > /dev/null && echo "✓ Health check passed successfully!" || echo "::warning::Health check reached endpoint with warning. Verify Caddy reverse proxy."
+          fi

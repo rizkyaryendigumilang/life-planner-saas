@@ -1,14 +1,32 @@
 name: Build Mobile Apps (APK & IPA) and Sync to VPS
 
 on:
-  workflow_dispatch: # Memungkinkan trigger manual dari tab Actions di GitHub
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Environment target (production, staging, development)'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      api_url:
+        description: 'Express API URL (optional override, e.g. https://api.yourdomain.com)'
+        required: false
+        default: ''
+      pocketbase_url:
+        description: 'PocketBase URL (optional override, e.g. https://pb.yourdomain.com)'
+        required: false
+        default: ''
   push:
     branches:
       - main
     paths-ignore:
       - 'README.md'
       - '.gitignore'
-      - '.github/workflows/**'
+      - '.github/workflows/ci-cd-web-vps.yml'
 
 jobs:
   # ==========================================
@@ -37,10 +55,19 @@ jobs:
           java-version: '21'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Web Application
-        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ inputs.api_url || secrets.VITE_API_BASE_URL }}
+          VITE_POCKETBASE_URL: ${{ inputs.pocketbase_url || secrets.VITE_POCKETBASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_POCKETBASE_URL:-}" ]; then
+            echo "::warning::VITE_POCKETBASE_URL not set in secrets! Android APK will use build fallback."
+          fi
+          npm run typecheck
+          npm run build
 
       - name: Sync to Capacitor Android
         run: npx cap sync android
@@ -63,7 +90,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer APK to VPS via SCP
-        if: false
+        if: ${{ secrets.VPS_HOST != '' && secrets.VPS_SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -93,10 +120,19 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Web Application
-        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ inputs.api_url || secrets.VITE_API_BASE_URL }}
+          VITE_POCKETBASE_URL: ${{ inputs.pocketbase_url || secrets.VITE_POCKETBASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VITE_POCKETBASE_URL:-}" ]; then
+            echo "::warning::VITE_POCKETBASE_URL not set in secrets! iOS IPA will use build fallback."
+          fi
+          npm run typecheck
+          npm run build
 
       - name: Sync to Capacitor iOS
         run: npx cap sync ios
@@ -134,7 +170,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer IPA to VPS via SCP
-        if: false
+        if: ${{ secrets.VPS_HOST != '' && secrets.VPS_SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}

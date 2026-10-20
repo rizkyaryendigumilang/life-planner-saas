@@ -3,6 +3,8 @@
 // (a LAN IP, a hotspot address, a tunnel), rewrite loopback endpoints to that
 // same host so the whole stack stays reachable without editing .env.
 
+import { Capacitor } from "@capacitor/core";
+
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"]);
 
 function currentHost() {
@@ -12,6 +14,20 @@ function currentHost() {
 
 export function resolveHost(configured: string | undefined, fallback: string) {
   const base = (configured || fallback).replace(/\/+$/, "");
+
+  // On native mobile (Android APK / iOS IPA), window.location.hostname is typically 'localhost'.
+  // Do NOT rewrite configured URLs to phone's loopback!
+  if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+    if (configured) {
+      return configured.replace(/\/+$/, "");
+    }
+    // Check if custom server URL was saved in settings
+    const custom = localStorage.getItem("lp_server_url");
+    if (custom) return custom.replace(/\/+$/, "");
+
+    return base;
+  }
+
   const host = currentHost();
   if (!host || LOOPBACK_HOSTS.has(host)) return base;
 
