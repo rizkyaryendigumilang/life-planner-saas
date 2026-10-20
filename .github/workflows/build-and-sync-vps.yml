@@ -37,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
     steps:
       - name: Checkout Code
@@ -90,7 +91,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer APK to VPS via SCP
-        if: ${{ secrets.VPS_HOST != '' && secrets.VPS_SSH_KEY != '' }}
+        if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -108,6 +109,7 @@ jobs:
     runs-on: macos-14
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
     steps:
       - name: Checkout Code
@@ -170,7 +172,7 @@ jobs:
           retention-days: 14
 
       - name: Transfer IPA to VPS via SCP
-        if: ${{ secrets.VPS_HOST != '' && secrets.VPS_SSH_KEY != '' }}
+        if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
