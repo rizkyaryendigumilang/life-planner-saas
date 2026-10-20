@@ -6,62 +6,96 @@ on:
     paths:
       - 'src/**'
       - 'public/**'
+      - 'server/**'
+      - 'scripts/**'
       - 'index.html'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.*'
-      - 'scripts/**'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'tsconfig*.json'
       - '.github/workflows/ci-cd-web-vps.yml'
   pull_request:
     branches: [main]
     paths:
       - 'src/**'
       - 'public/**'
+      - 'server/**'
+      - 'scripts/**'
       - 'index.html'
       - 'package.json'
       - 'package-lock.json'
       - 'vite.config.*'
-      - 'scripts/**'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'tsconfig*.json'
       - '.github/workflows/ci-cd-web-vps.yml'
   workflow_dispatch:
+    inputs:
+      deploy_to_vps:
+        description: 'Deploy web bundle to VPS after successful build'
+        type: boolean
+        default: true
+        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: life-planner-web-production
+  group: life-planner-production
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Validate and build web app
+    name: Validate, test, and build web app
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Run TypeScript typecheck
+        run: npm run typecheck
+
       - name: Build production web bundle
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_POCKETBASE_URL: ${{ secrets.VITE_POCKETBASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL || 'https://43.156.236.102/life-planner-api' }}
+          VITE_POCKETBASE_URL: ${{ vars.VITE_POCKETBASE_URL || secrets.VITE_POCKETBASE_URL || 'https://43.156.236.102/life-planner-pb' }}
         run: |
           set -euo pipefail
-          test -n "$VITE_API_BASE_URL" || { echo "Missing VITE_API_BASE_URL secret"; exit 1; }
-          test -n "$VITE_POCKETBASE_URL" || { echo "Missing VITE_POCKETBASE_URL secret"; exit 1; }
-          npm run typecheck
+          echo "Building Life Planner web with base path /life-planner/..."
           npm run build -- --base=/life-planner/
-      - name: Validate build output
+
+      - name: Validate build output integrity
         run: |
           set -euo pipefail
-          test -s dist/index.html
-          grep -q '/life-planner/assets/' dist/index.html
+          test -s dist/index.html || { echo "::error::dist/index.html is missing or empty"; exit 1; }
+          grep -q '/life-planner/assets/' dist/index.html || { echo "::error::dist/index.html is missing /life-planner/assets/ prefix"; exit 1; }
+          grep -q '/life-planner/sw.js' dist/index.html || { echo "::error::dist/index.html is missing /life-planner/sw.js registration"; exit 1; }
+          grep -q '/life-planner/manifest.webmanifest' dist/index.html || { echo "::error::dist/index.html is missing /life-planner/manifest.webmanifest link"; exit 1; }
+          if grep -E '(src|href)="/assets/' dist/index.html; then
+            echo "::error::Found un-prefixed root /assets/ paths in dist/index.html"; exit 1;
+          fi
+          test -d dist/assets || { echo "::error::dist/assets directory is missing"; exit 1; }
+          echo "✓ Build output passed all static path integrity checks."
+
       - name: Package web artifact
         run: tar -czf web-dist.tar.gz -C dist .
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload production web artifact
+        uses: actions/upload-artifact@v4
         with:
           name: life-planner-web-dist
           path: web-dist.tar.gz
@@ -70,85 +104,249 @@ jobs:
 
   deploy-production:
     name: Deploy web to production VPS
-    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_vps != false))
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Log deployment context
+        run: |
+          echo "=========================================="
+          echo "Starting Life Planner Production Deployment"
+          echo "Commit SHA : ${GITHUB_SHA}"
+          echo "Run ID     : ${GITHUB_RUN_ID}"
+          echo "Attempt    : ${GITHUB_RUN_ATTEMPT}"
+          echo "Ref        : ${GITHUB_REF}"
+          echo "Actor      : ${GITHUB_ACTOR}"
+          echo "Event      : ${GITHUB_EVENT_NAME}"
+          echo "Timestamp  : $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "=========================================="
+
+      - name: Download web build artifact
+        uses: actions/download-artifact@v4
         with:
           name: life-planner-web-dist
           path: ./artifact
-      - name: Configure verified SSH
-        id: ssh_setup
+
+      - name: Validate required secrets and configure verified SSH
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
           VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
           VPS_SSH_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          if [ -z "${VPS_HOST:-}" ] || [ -z "${VPS_USER:-}" ] || [ -z "${VPS_KEY:-}" ] || [ -z "${VPS_SSH_KNOWN_HOSTS:-}" ]; then
-            echo "::warning::VPS SSH secrets (VPS_SSH_KEY / VPS_SSH_KNOWN_HOSTS / VPS_USERNAME) not yet configured in GitHub. Web build artifact 'life-planner-web-dist' is ready. Skipping remote VPS SSH sync."
-            echo "skip_deploy=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          set +x
+
+          missing=""
+          [ -n "${VPS_HOST:-}" ] || missing="$missing VPS_HOST"
+          [ -n "${VPS_USER:-}" ] || missing="$missing VPS_USERNAME"
+          [ -n "${VPS_KEY:-}" ] || missing="$missing VPS_SSH_KEY"
+          [ -n "${VPS_SSH_KNOWN_HOSTS:-}" ] || missing="$missing VPS_SSH_KNOWN_HOSTS"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Deployment cannot proceed. Missing required secret(s):$missing. Configure them in repository Settings > Secrets and variables > Actions."
+            exit 1
           fi
-          echo "skip_deploy=false" >> "$GITHUB_OUTPUT"
-          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] && ((VPS_PORT > 0 && VPS_PORT < 65536)) || { echo "Invalid VPS_PORT"; exit 1; }
+
+          if [ "$VPS_USER" = "root" ]; then
+            echo "::error::Deployment policy violation: deployment must not use user 'root'. User 'ubuntu' is required."
+            exit 1
+          fi
+
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]] && ((VPS_PORT > 0 && VPS_PORT < 65536)) || {
+            echo "::error::Invalid VPS SSH port: '$VPS_PORT'. Must be an integer between 1 and 65535."
+            exit 1
+          }
+
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
+
           printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
-      - name: Upload validated bundle
-        if: steps.ssh_setup.outputs.skip_deploy != 'true'
+
+          echo "✓ SSH configuration and host key verification established strictly."
+
+      - name: Upload bundle to VPS
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
         run: |
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -P "$VPS_PORT" ./artifact/web-dist.tar.gz "$VPS_USER@$VPS_HOST:web-dist-${GITHUB_SHA}.tar.gz"
-      - name: Deploy with backup and rollback
-        if: steps.ssh_setup.outputs.skip_deploy != 'true'
+          set -euo pipefail
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./artifact/web-dist.tar.gz "$VPS_USER@$VPS_HOST:web-dist-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          echo "✓ Web bundle uploaded successfully."
+
+      - name: Deploy bundle atomically with backup
+        id: deploy
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
           VPS_ROOT: ${{ vars.VPS_WEB_ROOT || secrets.VPS_WEB_ROOT || '/srv/www/life-planner' }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -i "$HOME/.ssh/id_ed25519" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}'" <<'REMOTE'
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'REMOTE'
           set -Eeuo pipefail
+
           live="$1"
           slug="$2"
           release="$3"
-          [[ "$release" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          run_id="$4"
+
+          # 1. Directory safety boundary
+          case "$live" in
+            /srv/www/life-planner) ;;
+            *) echo "::error::Target directory must strictly be /srv/www/life-planner, received: $live"; exit 1 ;;
+          esac
+
+          [[ "$release" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid release commit SHA"; exit 1; }
           test -d "$live" && test ! -L "$live" || { echo "Target must be an existing real directory: $live"; exit 1; }
+
           parent="$HOME/.deploy-$slug"
-          stage="$parent/stage-$release"
-          backup="$parent/backup-$release.tar.gz"
+          stage="$parent/stage-${release}-${run_id}"
+          backup="$parent/backup-${release}-${run_id}.tar.gz"
           mkdir -p "$parent"
-          test ! -e "$stage" && test ! -e "$backup"
-          mkdir "$stage"
-          trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$backup" ]; then mkdir -p "$stage/restore"; tar -xzf "$backup" -C "$stage/restore"; rsync -a --delete "$stage/restore/" "$live/"; fi; rm -rf "$stage"; exit "$status"' ERR
-          tar -xzf "$HOME/web-dist-$release.tar.gz" -C "$stage"
-          test -s "$stage/index.html"
+
+          # Clean any stale staging dir from previous interrupted attempts
+          rm -rf "$stage"
+          mkdir -p "$stage"
+
+          # 2. Trap for automatic rollback if atomic switch fails
+          trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$backup" ]; then echo "Deploy failed on remote. Restoring from backup..."; mkdir -p "$stage/restore"; tar -xzf "$backup" -C "$stage/restore"; rsync -a --delete "$stage/restore/" "$live/"; fi; rm -rf "$stage"; exit "$status"' ERR
+
+          # 3. Extract and validate staged release
+          tar -xzf "$HOME/web-dist-${release}-${run_id}.tar.gz" -C "$stage"
+          test -s "$stage/index.html" || { echo "Staged bundle missing index.html"; exit 1; }
+          test -d "$stage/assets" || { echo "Staged bundle missing assets directory"; exit 1; }
+
+          # 4. Create isolated backup of current live release for this run
           tar -czf "$backup" -C "$live" .
+
+          # 5. Atomic sync to live directory
           rsync -a --delete "$stage/" "$live/"
+
+          # 6. Validate live directory
           test -s "$live/index.html"
           test -d "$live/assets"
-          rm -f "$HOME/web-dist-$release.tar.gz"
+
+          # 7. Cleanup incoming bundle and stage
+          rm -f "$HOME/web-dist-${release}-${run_id}.tar.gz"
           rm -rf "$stage"
           trap - ERR
+
+          # 8. Retain latest 5 backups to prevent disk leaks
+          ls -1t "$parent"/backup-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+
           echo "Deployment successful to $live; rollback archive: $backup"
           REMOTE
-      - name: Verify Web Deployment Health
-        if: steps.ssh_setup.outputs.skip_deploy != 'true'
+
+      - name: Verify application and API health
         env:
-          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL || vars.HEALTH_CHECK_URL || secrets.HEALTHCHECK_URL || secrets.HEALTH_CHECK_URL }}
+          APP_URL: ${{ vars.HEALTHCHECK_URL || vars.HEALTH_CHECK_URL || secrets.HEALTHCHECK_URL || secrets.HEALTH_CHECK_URL || 'https://43.156.236.102/life-planner/' }}
+          API_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL || 'https://43.156.236.102/life-planner-api' }}
+          PB_URL: ${{ vars.VITE_POCKETBASE_URL || secrets.VITE_POCKETBASE_URL || 'https://43.156.236.102/life-planner-pb' }}
         run: |
           set -euo pipefail
-          if [ -n "${HEALTHCHECK_URL:-}" ]; then
-            echo "Checking deployment health at $HEALTHCHECK_URL..."
-            curl -k -sSf -m 15 "$HEALTHCHECK_URL" > /dev/null && echo "✓ Health check passed successfully!" || echo "::warning::Health check reached endpoint with warning. Verify Caddy reverse proxy."
+
+          APP_BASE="${APP_URL%/}"
+          API_BASE="${API_URL%/}"
+          PB_BASE="${PB_URL%/}"
+
+          echo "Running strict TLS multi-point health check against deployed services..."
+          echo "Frontend  : $APP_BASE/"
+          echo "Express   : $API_BASE/api/health"
+          echo "PocketBase: $PB_BASE/api/health"
+
+          max_retries=6
+          delay=4
+
+          # 1. Frontend Health Verification (Strict TLS, no -k)
+          echo "Checking Frontend SPA at $APP_BASE/..."
+          fe_ok=0
+          for i in $(seq 1 $max_retries); do
+            html=$(curl -sSf -m 10 "$APP_BASE/" 2>/dev/null || true)
+            if [ -n "$html" ] && echo "$html" | grep -q 'id="root"' && echo "$html" | grep -q '/life-planner/assets/'; then
+              fe_ok=1
+              echo "✓ Frontend check passed on attempt $i (HTML served with correct asset prefixes and root mount)."
+              break
+            fi
+            echo "Attempt $i failed. Retrying in ${delay}s..."
+            sleep $delay
+          done
+
+          if [ "$fe_ok" -ne 1 ]; then
+            echo "::error::Frontend health check FAILED. The live application is not serving expected Life Planner bundle."
+            exit 1
           fi
+
+          # 2. PWA Manifest Verification (Strict TLS, no -k)
+          echo "Checking PWA Webmanifest at $APP_BASE/manifest.webmanifest..."
+          manifest=$(curl -sSf -m 10 "$APP_BASE/manifest.webmanifest" 2>/dev/null || true)
+          if echo "$manifest" | grep -q 'LifePlanner'; then
+            echo "✓ PWA Manifest check passed."
+          else
+            echo "::error::PWA Manifest check FAILED. Missing or invalid manifest."
+            exit 1
+          fi
+
+          # 3. Express API Health Verification (Strict TLS, no -k)
+          echo "Checking API Service at $API_BASE/api/health..."
+          api_resp=$(curl -sSf -m 10 "$API_BASE/api/health" 2>/dev/null || true)
+          if echo "$api_resp" | grep -q '"status":"ok"'; then
+            echo "✓ Express API check passed ($api_resp)."
+          else
+            echo "::error::Express API health check FAILED. Response: '$api_resp'"
+            exit 1
+          fi
+
+          # 4. PocketBase Health Verification (Strict TLS, no -k)
+          echo "Checking PocketBase at $PB_BASE/api/health..."
+          pb_resp=$(curl -sSf -m 10 "$PB_BASE/api/health" 2>/dev/null || true)
+          if echo "$pb_resp" | grep -q '"code":200'; then
+            echo "✓ PocketBase health check passed ($pb_resp)."
+          else
+            echo "::error::PocketBase health check FAILED. Response: '$pb_resp'"
+            exit 1
+          fi
+
+          echo "=========================================="
+          echo "✓ All strict-TLS multi-point production health checks passed successfully!"
+          echo "=========================================="
+
+      - name: Rollback deployment on health check failure
+        if: failure() && steps.deploy.outcome == 'success'
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_ROOT: ${{ vars.VPS_WEB_ROOT || secrets.VPS_WEB_ROOT || '/srv/www/life-planner' }}
+        run: |
+          set -euo pipefail
+          echo "::warning::Health check failed after deployment. Initiating automatic rollback on VPS..."
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'ROLLBACK'
+          set -euo pipefail
+          live="$1"
+          slug="$2"
+          release="$3"
+          run_id="$4"
+
+          parent="$HOME/.deploy-$slug"
+          backup="$parent/backup-${release}-${run_id}.tar.gz"
+
+          if [ -s "$backup" ]; then
+            echo "Restoring previous working release from $backup..."
+            restore_dir="$parent/restore-${release}-${run_id}"
+            mkdir -p "$restore_dir"
+            tar -xzf "$backup" -C "$restore_dir"
+            rsync -a --delete "$restore_dir/" "$live/"
+            rm -rf "$restore_dir"
+            echo "✓ Rollback completed successfully. Previous stable release restored to $live."
+          else
+            echo "::error::Rollback backup archive not found at $backup!"
+            exit 1
+          fi
+          ROLLBACK
