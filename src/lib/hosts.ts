@@ -31,6 +31,23 @@ export function resolveHost(configured: string | undefined, fallback: string) {
   const host = currentHost();
   if (!host || LOOPBACK_HOSTS.has(host)) return base;
 
+  // On production HTTPS web, internal loopback ports cannot be reached directly.
+  // Map loopback fallbacks to reverse-proxied paths.
+  if (typeof window !== "undefined" && window.location.protocol === "https:") {
+    if (base.startsWith("/")) {
+      return `${window.location.origin}${base}`.replace(/\/+$/, "");
+    }
+    try {
+      const url = new URL(base);
+      if (LOOPBACK_HOSTS.has(url.hostname)) {
+        const subpath = fallback.includes("8090") ? "/life-planner-pb" : "/life-planner-api";
+        return `${window.location.origin}${subpath}`;
+      }
+    } catch {
+      return base;
+    }
+  }
+
   try {
     const url = new URL(base);
     if (!LOOPBACK_HOSTS.has(url.hostname)) return base;

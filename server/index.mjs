@@ -17,11 +17,47 @@ const API_HOST = process.env.API_HOST || "0.0.0.0";
 const PB_URL = process.env.PB_URL || "http://127.0.0.1:8090";
 
 const SUPERUSER_EMAIL = process.env.PB_SUPERUSER_EMAIL;
-const SUPERUSER_PASSWORD = process.env.PB_SUPERUSER_PASSWORD;
 const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (FRONTEND_ORIGINS.includes(origin)) return true;
+
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+
+    // Allow local development & loopback
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") {
+      return true;
+    }
+    // Allow private LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    if (
+      /^192\.168\./.test(host) ||
+      /^10\./.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return true;
+    }
+    // Allow Capacitor / Ionic native mobile origins
+    if (url.protocol === "capacitor:" || url.protocol === "ionic:" || origin.startsWith("https://localhost")) {
+      return true;
+    }
+    // Allow configured production VPS host
+    if (process.env.PUBLIC_BASE) {
+      try {
+        const publicUrl = new URL(process.env.PUBLIC_BASE);
+        if (url.host === publicUrl.host) return true;
+      } catch {}
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
 
 if (!SUPERUSER_EMAIL || !SUPERUSER_PASSWORD) {
   throw new Error(
@@ -38,13 +74,12 @@ app.use(helmet());
 app.use(
   cors({
     origin(origin, callback) {
-      // Native clients and local scripts may not send Origin.
-      if (!origin || FRONTEND_ORIGINS.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
-      return callback(new Error("Origin is not allowed by CORS"));
+      return callback(null, false);
     },
-    credentials: false,
+    credentials: true,
   }),
 );
 

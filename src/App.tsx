@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { pb } from "./lib/pocketbase";
 import { useAuth } from "./hooks/use-pocketbase";
 import { ThemeProvider, useTheme } from "./hooks/use-theme";
+import { useCapacitor } from "./hooks/use-capacitor";
 import { Login } from "./pages/Login";
 import { AppShell, type Page } from "./components/layout";
 import { Toaster, toast } from "sonner";
@@ -40,6 +41,12 @@ function Workspace() {
   const auth = useAuth();
   const { resolved } = useTheme();
   const [page, setPage] = useState<Page>("overview");
+
+  useCapacitor({
+    page,
+    onNavigate: setPage,
+    isDark: resolved === "dark",
+  });
 
   useEffect(() => {
     const handler = (event: Event) => setPage((event as CustomEvent<Page>).detail);

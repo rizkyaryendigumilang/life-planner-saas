@@ -317,6 +317,9 @@ export function Dashboard({
   const [timeframe, setTimeframe] =
     useState<TimeframeKey>("month");
 
+  const [hoveredBar, setHoveredBar] =
+    useState<{ name: string; date: Date; value: number } | null>(null);
+
   const [scanOpen, setScanOpen] =
     useState(false);
 
@@ -620,30 +623,34 @@ export function Dashboard({
         </div>
       </div>
 
-      <Card className="mb-4 p-2">
-        <div className="flex flex-wrap gap-1">
-          {TIMEFRAMES.map(
-            (item) => (
+      {/* Timeframe Segmented Control */}
+      <div className="mb-5 flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="inline-flex items-center gap-1 rounded-xl bg-muted/60 p-1 border border-line/10 shadow-xs">
+          {TIMEFRAMES.map((item) => {
+            const isSelected = timeframe === item.key;
+            return (
               <button
                 key={item.key}
                 type="button"
-                onClick={() =>
-                  setTimeframe(
-                    item.key,
-                  )
-                }
-                className={`rounded-lg px-3 py-2 text-xs font-medium transition ${
-                  timeframe === item.key
-                    ? "bg-accent text-accent-ink shadow-sm"
-                    : "text-ink-soft hover:bg-muted hover:text-ink"
+                onClick={() => {
+                  setTimeframe(item.key);
+                  setHoveredBar(null);
+                  if (typeof navigator !== "undefined" && navigator.vibrate) {
+                    navigator.vibrate(8);
+                  }
+                }}
+                className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                  isSelected
+                    ? "bg-accent text-accent-ink font-semibold shadow-xs"
+                    : "text-ink-soft hover:text-ink hover:bg-surface/50"
                 }`}
               >
                 {item.label}
               </button>
-            ),
-          )}
+            );
+          })}
         </div>
-      </Card>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
@@ -716,81 +723,126 @@ export function Dashboard({
               </h2>
 
               <p className="mt-1 text-xs text-ink-soft">
-                {getRangeLabel(
-                  timeframe,
-                )} financial activity
+                {hoveredBar
+                  ? `${formatDate(hoveredBar.date)} · ${hoveredBar.value >= 0 ? "+" : ""}${formatIDR(hoveredBar.value)}`
+                  : `${getRangeLabel(timeframe)} financial activity`}
               </p>
             </div>
 
-            <Badge>
-              {getRangeLabel(
-                timeframe,
+            <div className="flex items-center gap-2">
+              {hoveredBar && (
+                <button
+                  type="button"
+                  onClick={() => setHoveredBar(null)}
+                  className="text-[10px] text-ink-soft hover:text-ink underline"
+                >
+                  Reset
+                </button>
               )}
-            </Badge>
+              <Badge tone={hoveredBar ? (hoveredBar.value >= 0 ? "success" : "danger") : "neutral"}>
+                {hoveredBar
+                  ? hoveredBar.value >= 0
+                    ? "Surplus"
+                    : "Deficit"
+                  : getRangeLabel(timeframe)}
+              </Badge>
+            </div>
           </div>
 
           <div className="mt-5 h-64">
             {chartData.length ? (
-              <div className="flex h-full items-end gap-2">
-                {chartData.map(
-                  (item) => {
-                    const max =
-                      Math.max(
-                        ...chartData.map(
-                          (x) =>
-                            Math.abs(
-                              x.value,
-                            ),
-                        ),
-                        1,
-                      );
+              <div className="flex h-full flex-col justify-end">
+                <div className="flex h-52 items-end gap-2 pb-1">
+                  {chartData.map((item) => {
+                    const max = Math.max(
+                      ...chartData.map((x) => Math.abs(x.value)),
+                      1,
+                    );
 
-                    const height =
-                      Math.max(
-                        8,
-                        Math.round(
-                          (Math.abs(
-                            item.value,
-                          ) /
-                            max) *
-                            90,
-                        ),
-                      );
+                    const height = Math.max(
+                      10,
+                      Math.round((Math.abs(item.value) / max) * 92),
+                    );
+
+                    const isSelected = hoveredBar?.date.getTime() === item.date.getTime();
 
                     return (
                       <div
                         key={`${item.name}-${item.date.getTime()}`}
-                        className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2"
+                        className="group relative flex min-w-0 flex-1 flex-col items-center justify-end h-full"
+                        onMouseEnter={() => setHoveredBar(item)}
+                        onMouseLeave={() => setHoveredBar(null)}
+                        onClick={() => setHoveredBar(item)}
                       >
+                        {/* Interactive floating tooltip on hover */}
+                        <div className="pointer-events-none absolute -top-12 z-20 hidden flex-col items-center group-hover:flex transition-all duration-150 animate-in fade-in zoom-in-95">
+                          <div className="rounded-lg bg-surface-elevated/95 dark:bg-muted px-2.5 py-1 text-center shadow-lg border border-line/15 backdrop-blur-md">
+                            <p className="text-[10px] font-medium text-ink-soft whitespace-nowrap">
+                              {formatDate(item.date)}
+                            </p>
+                            <p className={`text-xs font-bold tabular-nums whitespace-nowrap ${
+                              item.value >= 0 ? "text-positive" : "text-negative"
+                            }`}>
+                              {item.value >= 0 ? "+" : ""}{formatIDR(item.value)}
+                            </p>
+                          </div>
+                          <div className="h-1.5 w-1.5 rotate-45 bg-surface-elevated/95 dark:bg-muted border-r border-b border-line/15 -mt-1" />
+                        </div>
+
+                        {/* Bar with emerald/rose gradient */}
                         <div
-                          title={`${item.name}: ${formatIDR(
-                            item.value,
-                          )}`}
-                          className="w-full max-w-10 rounded-t bg-accent"
+                          className={`w-full max-w-10 rounded-t-md transition-all duration-200 cursor-pointer group-hover:scale-y-105 origin-bottom bg-gradient-to-t ${
+                            item.value >= 0
+                              ? "from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 shadow-xs shadow-emerald-500/15"
+                              : "from-rose-600 to-rose-400 hover:from-rose-500 hover:to-rose-300 shadow-xs shadow-rose-500/15"
+                          } ${isSelected ? "ring-2 ring-accent" : ""}`}
                           style={{
                             height: `${height}%`,
-                            opacity:
-                              item.value >=
-                              0
-                                ? 0.9
-                                : 0.45,
+                            opacity: hoveredBar && !isSelected ? 0.45 : 1,
                           }}
                         />
-
-                        <span className="truncate text-[10px] text-ink-soft">
-                          {item.name}
-                        </span>
                       </div>
                     );
-                  },
-                )}
+                  })}
+                </div>
+
+                {/* Zero baseline guide */}
+                <div className="w-full border-b border-line/15" />
+
+                {/* X-axis labels */}
+                <div className="flex items-center gap-2 pt-2">
+                  {chartData.map((item) => (
+                    <div
+                      key={`label-${item.name}-${item.date.getTime()}`}
+                      className="flex min-w-0 flex-1 justify-center"
+                    >
+                      <span className="truncate text-[10px] font-medium text-ink-soft">
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : loading ? (
               <Skeleton className="h-full w-full" />
             ) : (
-              <div className="flex h-full items-center justify-center rounded-xl bg-muted text-sm text-ink-soft">
-                No cash flow data for
-                this timeframe.
+              <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-line/20 bg-muted/20 p-6 text-center">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-ink-soft mb-3 shadow-xs">
+                  <CircleDollarSign size={24} className="stroke-[1.5]" />
+                </div>
+                <p className="text-sm font-semibold text-ink">Belum ada transaksi</p>
+                <p className="mt-1 max-w-xs text-xs text-ink-soft">
+                  Tidak ada catatan arus kas pada periode {getRangeLabel(timeframe).toLowerCase()}.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4 gap-1.5 text-xs"
+                  onClick={() => window.dispatchEvent(new CustomEvent("life-planner:navigate", { detail: "finance" }))}
+                >
+                  <Plus size={13} />
+                  Catat transaksi
+                </Button>
               </div>
             )}
           </div>
@@ -857,9 +909,23 @@ export function Dashboard({
                   </div>
                 ))
             ) : (
-              <div className="rounded-xl bg-muted p-6 text-center text-sm text-ink-soft">
-                No commitments in
-                this timeframe.
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-line/20 bg-muted/20 p-6 text-center">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-ink-soft mb-2.5">
+                  <ListChecks size={20} className="stroke-[1.5]" />
+                </div>
+                <p className="text-sm font-semibold text-ink">Semua komitmen selesai</p>
+                <p className="mt-1 text-xs text-ink-soft">
+                  Tidak ada tugas atau deadline terbuka pada periode ini.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3.5 gap-1.5 text-xs"
+                  onClick={() => window.dispatchEvent(new CustomEvent("life-planner:navigate", { detail: "planner" }))}
+                >
+                  <Plus size={13} />
+                  Buka Planner
+                </Button>
               </div>
             )}
           </div>
@@ -1134,9 +1200,23 @@ export function Dashboard({
                   </div>
                 ))
             ) : (
-              <div className="p-10 text-center text-sm text-ink-soft">
-                No transactions for
-                this timeframe.
+              <div className="flex flex-col items-center justify-center p-10 text-center">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-muted text-ink-soft mb-3">
+                  <WalletCards size={22} className="stroke-[1.5]" />
+                </div>
+                <p className="text-sm font-semibold text-ink">Belum ada riwayat transaksi</p>
+                <p className="mt-1 text-xs text-ink-soft max-w-sm">
+                  Belum ada mutasi keuangan tercatat untuk periode {getRangeLabel(timeframe).toLowerCase()}.
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4 gap-1.5 text-xs"
+                  onClick={() => window.dispatchEvent(new CustomEvent("life-planner:navigate", { detail: "finance" }))}
+                >
+                  <Plus size={13} />
+                  Tambah transaksi
+                </Button>
               </div>
             )}
           </div>
@@ -1177,7 +1257,7 @@ function Metric({
           {loading ? (
             <Skeleton className="mt-2 h-7 w-28" />
           ) : (
-            <p className="mt-1 text-xl font-semibold tracking-tight">
+            <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
               {value}
             </p>
           )}

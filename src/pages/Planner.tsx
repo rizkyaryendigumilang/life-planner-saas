@@ -108,6 +108,11 @@ export function Planner() {
   }
 
   async function toggle(t: Task) {
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try {
+        navigator.vibrate(12);
+      } catch {}
+    }
     await update(t, {
       status: t.status === "Done" ? "To-Do" : "Done",
     });
@@ -339,9 +344,10 @@ function TaskColumn({
       </div>
 
       {tasks.length === 0 && (
-        <p className="mt-12 text-center text-xs text-ink-faint">
-          Drop tasks here
-        </p>
+        <div className="mt-6 rounded-xl border border-dashed border-line/15 p-6 text-center">
+          <p className="text-xs font-medium text-ink-faint">No tasks in {status}</p>
+          <p className="mt-0.5 text-[10px] text-ink-soft/70">Drag items here or add new ones</p>
+        </div>
       )}
     </div>
   );
@@ -380,7 +386,7 @@ function TaskCard({
         <button
           {...attributes}
           {...listeners}
-          className="mt-0.5 shrink-0 text-ink-faint opacity-0 transition group-hover:opacity-100"
+          className="mt-0.5 shrink-0 text-ink-faint opacity-50 sm:opacity-0 sm:group-hover:opacity-100 transition hover:text-ink active:scale-95 touch-none"
           aria-label="Drag task"
         >
           <GripVertical size={15} />
@@ -520,8 +526,14 @@ function TaskList({
           </div>
         ))
       ) : (
-        <div className="p-10 text-center text-sm text-ink-soft">
-          No tasks in this view.
+        <div className="flex flex-col items-center justify-center p-12 text-center">
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-muted text-ink-soft">
+            <ListTodo size={20} />
+          </div>
+          <p className="mt-3.5 text-sm font-semibold text-ink">No tasks found</p>
+          <p className="mt-1 max-w-xs text-xs text-ink-soft">
+            All clear in this view. Plan your day by creating your first task above.
+          </p>
         </div>
       )}
     </Card>

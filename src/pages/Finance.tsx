@@ -131,8 +131,11 @@ export function Finance() {
   const [loading, setLoading] =
     useState(true);
 
-  const [selectedMonth, setSelectedMonth] =
-    useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalItems, setTotalItems] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [
     editingTransaction,
@@ -158,111 +161,102 @@ export function Finance() {
 
   /*
    * =========================================================
-   * LOAD FINANCE
+   * LOAD FINANCE (OPTIMIZED PAGINATION & DATE FILTER)
    * =========================================================
-   *
-   * IMPORTANT:
-   *
-   * expenses is loaded independently.
-   *
-   * pets and bank_accounts cannot break
-   * the transaction list.
    */
-  const load = async () => {
-    setLoading(true);
+  const PAGE_SIZE = 60;
+
+  const load = async (page = 1, append = false, month = selectedMonth) => {
+    if (page === 1 && !append) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
     try {
       /*
-       * -------------------------------------------------------
-       * 1. LOAD EXPENSES FIRST
-       * -------------------------------------------------------
+       * 1. LOAD EXPENSES WITH DATE FILTER AND PAGINATION
        */
-      let expenseRecords: Expense[] =
-        [];
+      let filter = "";
+      if (month !== "all") {
+        filter = `date >= "${month}-01" && date <= "${month}-31"`;
+      }
 
       try {
-        expenseRecords =
-          await pb
-            .collection("expenses")
-            .getFullList<Expense>({
-              sort: "-date,-created",
-            });
+        const res = await pb
+          .collection("expenses")
+          .getList<Expense>(page, PAGE_SIZE, {
+            sort: "-date,-created",
+            filter: filter || undefined,
+          });
 
-        setItems(expenseRecords);
+        setCurrentPage(res.page);
+        setTotalItems(res.totalItems);
+        setHasMore(res.page < res.totalPages);
+
+        if (append) {
+          setItems((prev) => {
+            const existingIds = new Set(prev.map((i) => i.id));
+            const fresh = res.items.filter((i) => !existingIds.has(i.id));
+            return [...prev, ...fresh];
+          });
+        } else {
+          setItems(res.items);
+        }
       } catch (expenseError) {
-        console.error(
-          "FINANCE EXPENSE LOAD FAILED:",
-          expenseError,
-        );
-
-        toast.error(
-          "Could not load transactions.",
-        );
+        console.error("FINANCE EXPENSE LOAD FAILED:", expenseError);
+        toast.error("Could not load transactions.");
       }
 
       /*
-       * -------------------------------------------------------
-       * 2. LOAD PETS
-       * -------------------------------------------------------
-       *
-       * Failure here must NOT affect expenses.
+       * 2. LOAD PETS (FIRST PAGE ONLY)
        */
-      try {
-        const petRecords =
-          await pb
+      if (page === 1 && !append) {
+        try {
+          const petRecords = await pb
             .collection("pets")
             .getFullList<PetOption>({
               sort: "name",
             });
+          setPets(petRecords);
+        } catch (petError) {
+          console.error("Failed to load pets:", petError);
+          setPets([]);
+        }
 
-        setPets(petRecords);
-      } catch (petError) {
-        console.error(
-          "Failed to load pets:",
-          petError,
-        );
-
-        setPets([]);
-      }
-
-      /*
-       * -------------------------------------------------------
-       * 3. LOAD BANK ACCOUNTS
-       * -------------------------------------------------------
-       *
-       * Failure here must NOT affect expenses.
-       */
-      try {
-        const accountRecords =
-          await pb
+        /*
+         * 3. LOAD BANK ACCOUNTS (FIRST PAGE ONLY)
+         */
+        try {
+          const accountRecords = await pb
             .collection("bank_accounts")
             .getFullList<BankAccount>({
               sort: "bank_name",
             });
-
-        setBankAccounts(
-          accountRecords,
-        );
-      } catch (accountError) {
-        console.error(
-          "Failed to load bank accounts:",
-          accountError,
-        );
-
-        setBankAccounts([]);
+          setBankAccounts(accountRecords);
+        } catch (accountError) {
+          console.error("Failed to load bank accounts:", accountError);
+          setBankAccounts([]);
+        }
       }
     } catch (error) {
-      console.error(
-        "Unexpected finance loading error:",
-        error,
-      );
-
-      toast.error(
-        "Could not load financial data.",
-      );
+      console.error("Unexpected finance loading error:", error);
+      toast.error("Could not load financial data.");
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMore = () => {
+    if (hasMore && !loadingMore) {
+      void load(currentPage + 1, true, selectedMonth);
+    }
+  };
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    void load(1, false, month);
   };
 
   /*
@@ -271,12 +265,12 @@ export function Finance() {
    * =========================================================
    */
   useEffect(() => {
-    void load();
+    void load(1, false, selectedMonth);
 
     const handleRestored = (e: Event) => {
       const collection = (e as CustomEvent).detail?.collection;
       if (collection === "expenses" || collection === "bank_accounts") {
-        void load();
+        void load(1, false, selectedMonth);
       }
     };
     window.addEventListener("life-planner:data-restored", handleRestored);
@@ -285,28 +279,25 @@ export function Finance() {
 
   /*
    * =========================================================
-   * MONTH OPTIONS
+   * MONTH OPTIONS (PRE-POPULATE 12 RECENT MONTHS)
    * =========================================================
    */
   const monthOptions = useMemo(() => {
     const months = new Set<string>();
 
     items.forEach((item) => {
-      const month =
-        getMonthKey(item.date);
-
-      if (month) {
-        months.add(month);
-      }
+      const month = getMonthKey(item.date);
+      if (month) months.add(month);
     });
 
-    months.add(
-      getCurrentMonthKey(),
-    );
+    // Populate past 12 months up to current month by default
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
 
-    return Array.from(months).sort(
-      (a, b) => b.localeCompare(a),
-    );
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [items]);
 
   /*
@@ -621,6 +612,10 @@ export function Finance() {
           ),
         );
 
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(10);
+        }
+
         toast.success(
           "Transaction updated",
         );
@@ -803,6 +798,10 @@ export function Finance() {
 
         await load();
 
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(12);
+        }
+
         toast.success(
           "Transaction created successfully",
         );
@@ -860,6 +859,10 @@ export function Finance() {
               deleteTarget.id,
           ),
         );
+
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(15);
+        }
 
         toast.success(
           "Transaksi dipindahkan ke Tempat Sampah (Recycle Bin)",
@@ -926,9 +929,7 @@ export function Finance() {
         <div className="w-full sm:w-56">
           <Select
             value={selectedMonth}
-            onValueChange={
-              setSelectedMonth
-            }
+            onValueChange={handleMonthChange}
           >
             <SelectItem value="all">
               All months
@@ -1346,6 +1347,21 @@ export function Finance() {
                 ),
               )}
             </div>
+
+            {hasMore && (
+              <div className="flex items-center justify-center border-t border-line/10 p-4 bg-muted/20">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="w-full sm:w-auto text-xs"
+                >
+                  {loadingMore
+                    ? "Loading more transactions..."
+                    : `Load more transactions (${items.length} of ${totalItems} loaded)`}
+                </Button>
+              </div>
+            )}
           </>
         ) : (
           <div className="p-10 text-center text-sm text-ink-soft">

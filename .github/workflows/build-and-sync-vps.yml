@@ -90,16 +90,43 @@ jobs:
           path: app-latest.apk
           retention-days: 14
 
-      - name: Transfer APK to VPS via SCP
+      - name: Transfer APK to VPS via Verified SSH & SCP
         if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
-          username: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
-          source: 'app-latest.apk'
-          target: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
+          VPS_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_TARGET: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+            chmod 600 "$HOME/.ssh/known_hosts"
+            STRICT_OPT="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          else
+            STRICT_OPT="-o StrictHostKeyChecking=no"
+          fi
+
+          # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
+          echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
+          ssh -o BatchMode=yes $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo mkdir -p '$VPS_TARGET' && sudo chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
+
+          # 2. Upload APK via SCP
+          echo "Mentransfer app-latest.apk ke VPS..."
+          scp -o BatchMode=yes $STRICT_OPT -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"
+
+          # 3. Pastikan izin akses file agar dapat diunduh melalui web server (Caddy/Nginx)
+          ssh -o BatchMode=yes $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+            "chmod 644 '$VPS_TARGET/app-latest.apk'"
+
+          rm -f "$HOME/.ssh/id_ed25519"
+          echo "✓ Android APK berhasil ditransfer ke $VPS_TARGET/app-latest.apk"
 
   # ==========================================
   # 2. BUILD IOS (.IPA) - RUN ON MACOS CLOUD
@@ -173,11 +200,37 @@ jobs:
 
       - name: Transfer IPA to VPS via SCP
         if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
-          username: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
-          source: 'app-latest.ipa'
-          target: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
+          VPS_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_TARGET: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+            chmod 600 "$HOME/.ssh/known_hosts"
+            STRICT_OPT="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          else
+            STRICT_OPT="-o StrictHostKeyChecking=no"
+          fi
+          # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
+          echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
+          ssh -o BatchMode=yes $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo mkdir -p '$VPS_TARGET' && sudo chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
+
+          # 2. Upload IPA via SCP
+          echo "Mentransfer app-latest.ipa ke VPS..."
+          scp -o BatchMode=yes $STRICT_OPT -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"
+
+          # 3. Pastikan izin akses file agar dapat diunduh melalui web server
+          ssh -o BatchMode=yes $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+            "chmod 644 '$VPS_TARGET/app-latest.ipa'"
+
+          rm -f "$HOME/.ssh/id_ed25519"
+          echo "✓ iOS IPA berhasil ditransfer ke $VPS_TARGET/app-latest.ipa"

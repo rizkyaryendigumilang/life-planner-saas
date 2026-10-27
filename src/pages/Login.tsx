@@ -29,11 +29,42 @@ function readModeParam(): AuthMode | "" {
   return value === "login" || value === "signup" || value === "forgot" || value === "reset" ? (value as AuthMode) : "";
 }
 function friendlyError(error: unknown) {
-  const e = error as { response?: { message?: string; data?: Record<string, { message?: string }> }; message?: string };
+  const e = error as {
+    status?: number;
+    response?: { message?: string; data?: Record<string, { message?: string; code?: string }> };
+    message?: string;
+  };
+
+  // Extract detailed validation message from PocketBase if present
+  if (e?.response?.data && typeof e.response.data === "object") {
+    for (const key of Object.keys(e.response.data)) {
+      const fieldMsg = e.response.data[key]?.message;
+      if (fieldMsg) return fieldMsg;
+    }
+  }
+
   const msg = e?.response?.message || e?.message || "Something went wrong. Please try again.";
-  if (/Failed to authenticate|invalid email or password|doesn't match/i.test(msg)) return "That email and password don't match.";
-  if (/network|fetch failed|failed to fetch/i.test(msg)) return "Can't reach the server. Check your connection and PocketBase.";
-  if (/already registered|already exists|unique/i.test(msg)) return "That email is already registered. Try signing in instead.";
+
+  // Standard authentication failure (PocketBase 400 Failed to authenticate)
+  if (e?.status === 400 || /Failed to authenticate|invalid email or password|doesn't match/i.test(msg)) {
+    return "That email/username or password doesn't match.";
+  }
+
+  // Network / server unreachable
+  if (/network|fetch failed|failed to fetch/i.test(msg)) {
+    return "Can't reach the server. Check your connection and PocketBase.";
+  }
+
+  // Duplicate registration
+  if (/already registered|already exists|unique/i.test(msg)) {
+    return "That email is already registered. Try signing in instead.";
+  }
+
+  // Route / endpoint not found (404)
+  if (e?.status === 404 || /File not found|The requested resource wasn't found/i.test(msg)) {
+    return "Authentication endpoint not found (404). Please verify PocketBase service URL.";
+  }
+
   return msg;
 }
 
@@ -175,7 +206,9 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   async function submitLogin(e: FormEvent) {
     e.preventDefault(); setBusy(true);
     try {
-      const result = await pb.collection("users").authWithPassword(email.trim().toLowerCase(), password);
+      const trimmed = email.trim();
+      const identity = trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
+      const result = await pb.collection("users").authWithPassword(identity, password);
       if (!validateActiveUser(result.record)) return;
       toast.success("Signed in. Welcome back!");
       onAuthenticated();
@@ -359,13 +392,13 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
 
               <form onSubmit={submitLogin} className="mt-7 space-y-4">
                 <div>
-                  <Label>Email</Label>
+                  <Label>Email or username</Label>
                   <Input
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
+                    placeholder="you@example.com or username"
+                    autoComplete="username"
                     autoFocus
                     required
                   />

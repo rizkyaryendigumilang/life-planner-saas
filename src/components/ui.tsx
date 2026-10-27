@@ -473,7 +473,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cx(
-          "dialog-scroll w-full max-w-xl rounded-t-2xl border border-line/15 bg-surface p-5 shadow-pop sm:rounded-xl sm:p-6",
+          "dialog-scroll w-full max-w-xl rounded-t-2xl border border-line/15 bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-pop sm:rounded-xl sm:p-6",
           className,
         )}
       >

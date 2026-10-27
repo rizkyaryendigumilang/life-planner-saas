@@ -9,9 +9,9 @@ export function formatIDR(value: number | string | null | undefined) {
   }).format(Number.isFinite(numeric) ? numeric : 0);
 }
 
-export function formatDate(value?: string | null) {
+export function formatDate(value?: string | Date | null) {
   if (!value) return "—";
-  const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  const date = value instanceof Date ? value : new Date(value.length === 10 ? `${value}T00:00:00` : value);
   if (Number.isNaN(date.getTime())) return "—";
   return new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }

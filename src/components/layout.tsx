@@ -144,7 +144,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     <div className="min-h-screen bg-canvas text-ink">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[262px] flex-col border-r border-line/10 bg-surface px-3 py-5 transition-transform duration-200 lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[262px] flex-col border-r border-line/10 bg-surface px-3 py-5 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] transition-transform duration-200 lg:translate-x-0 lg:pt-5 lg:pb-5 lg:pl-3",
           open ? "translate-x-0 shadow-pop" : "-translate-x-full",
         )}
       >
@@ -275,8 +275,8 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
         />
       )}
 
-      <main className="min-h-screen lg:pl-[262px]">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line/10 bg-canvas/85 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+      <main className="min-h-screen pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)] lg:pl-[262px]">
+        <header className="sticky top-0 z-20 flex min-h-16 pt-[env(safe-area-inset-top,0px)] items-center justify-between gap-3 border-b border-line/10 bg-canvas/85 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-2.5">
             <Button className="lg:hidden" size="icon" variant="outline" onClick={() => setOpen(true)} aria-label="Open navigation">
               <Menu size={17} />
@@ -306,7 +306,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
           </div>
         </header>
         <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">{children}</div>
-        <footer className="flex flex-col sm:flex-row items-center justify-center gap-2 px-6 pb-8 pt-4 text-center text-xs text-ink-faint">
+        <footer className="flex flex-col sm:flex-row items-center justify-center gap-2 px-6 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4 text-center text-xs text-ink-faint">
           <div className="flex items-center gap-1.5 font-medium text-ink-soft">
             <BrandLogo variant="mark" size="xs" />
             <span>LifePlanner</span>
