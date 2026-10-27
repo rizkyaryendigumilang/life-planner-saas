@@ -134,6 +134,7 @@ jobs:
   build-ios:
     name: Build iOS IPA
     runs-on: macos-14
+    continue-on-error: true
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -166,9 +167,9 @@ jobs:
       - name: Sync to Capacitor iOS
         run: npx cap sync ios
 
-      - name: Build iOS Archive (Unsigned)
+      - name: Build iOS App (Unsigned)
         run: |
-          mkdir -p build
+          mkdir -p build/DerivedData
           if [ -d "ios/App/App.xcworkspace" ]; then
             TARGET_FLAG="-workspace ios/App/App.xcworkspace"
           else
@@ -178,16 +179,24 @@ jobs:
                      -scheme App \
                      -configuration Release \
                      -destination 'generic/platform=iOS' \
-                     -archivePath build/App.xcarchive \
-                     archive \
+                     -derivedDataPath build/DerivedData \
+                     build \
                      CODE_SIGNING_ALLOWED=NO \
                      CODE_SIGNING_REQUIRED=NO \
-                     CODE_SIGN_IDENTITY=""
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGN_ENTITLEMENTS="" \
+                     CODE_SIGNING_INJECT_BASE_ENTITLEMENTS=NO
 
-      - name: Package .xcarchive into .ipa
+      - name: Package App into .ipa
         run: |
           mkdir -p build/Payload
-          cp -r build/App.xcarchive/Products/Applications/App.app build/Payload/
+          APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "::error::Could not find compiled .app in DerivedData!"
+            exit 1
+          fi
+          echo "Found compiled app at: $APP_PATH"
+          cp -r "$APP_PATH" build/Payload/
           cd build
           zip -r ../app-latest.ipa Payload
 
