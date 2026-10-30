@@ -16,6 +16,7 @@ import { ArrowUpRight,
   Eye, type LucideIcon } from 'lucide-react';
 
 import { pb } from "../lib/pocketbase";
+import { getCache, setCache } from "../lib/swr-cache";
 
 import {
   Badge,
@@ -294,24 +295,37 @@ export function Dashboard({
 }: {
   section?: string;
 } = {}) {
+  type DashboardBundle = {
+    expenses: Expense[];
+    tasks: Task[];
+    trips: Trip[];
+    investments: Investment[];
+    quotes: Map<string, MarketQuote>;
+  };
+
+  const initialCache = useMemo(
+    () => getCache<DashboardBundle>("dashboard_overview"),
+    [],
+  );
+
   const [loading, setLoading] =
-    useState(true);
+    useState(!initialCache);
 
   const [expenses, setExpenses] =
-    useState<Expense[]>([]);
+    useState<Expense[]>(() => initialCache?.expenses || []);
 
   const [tasks, setTasks] =
-    useState<Task[]>([]);
+    useState<Task[]>(() => initialCache?.tasks || []);
 
   const [trips, setTrips] =
-    useState<Trip[]>([]);
+    useState<Trip[]>(() => initialCache?.trips || []);
 
   const [investments, setInvestments] =
-    useState<Investment[]>([]);
+    useState<Investment[]>(() => initialCache?.investments || []);
 
   const [quotes, setQuotes] =
     useState<Map<string, MarketQuote>>(
-      new Map(),
+      () => initialCache?.quotes || new Map(),
     );
 
   const [timeframe, setTimeframe] =
@@ -341,24 +355,28 @@ export function Dashboard({
             .collection("expenses")
             .getList<Expense>(1, 150, {
               sort: "-date",
+              fields: "id,user,date,amount,category,type,notes,paid,account,pet",
             }),
 
           pb
             .collection("life_planner")
             .getList<Task>(1, 60, {
               sort: "order,due_date",
+              fields: "id,user,title,due_date,status,priority,category,order",
             }),
 
           pb
             .collection("travel_trips")
             .getList<Trip>(1, 25, {
               sort: "start_date",
+              fields: "id,user,name,destination,start_date,end_date,budget,actual,notes",
             }),
 
           pb
             .collection("investments")
             .getList<Investment>(1, 50, {
               sort: "-updated,-created",
+              fields: "id,user,mode,asset_type,symbol,asset_name,quantity,average_price",
             }),
         ]);
 
@@ -373,11 +391,18 @@ export function Dashboard({
           investmentRes.items,
         );
 
-        setQuotes(
-          await getMarketQuotes(
-            investmentRes.items,
-          ),
+        const resolvedQuotes = await getMarketQuotes(
+          investmentRes.items,
         );
+        setQuotes(resolvedQuotes);
+
+        setCache<DashboardBundle>("dashboard_overview", {
+          expenses: expenseRes.items,
+          tasks: taskRes.items,
+          trips: tripRes.items,
+          investments: investmentRes.items,
+          quotes: resolvedQuotes,
+        }, 60_000);
       } catch {
         if (!active) {
           return;

@@ -16,6 +16,7 @@ import {
 import { Badge, Button, Card, Skeleton } from "../components/ui";
 import { API_BASE } from "../lib/hosts";
 import { pb } from "../lib/pocketbase";
+import { getCache, setCache } from "../lib/swr-cache";
 
 const TOKEN_STORAGE_KEY = "lp-shortcut-token";
 
@@ -131,20 +132,53 @@ export function Calendar() {
     };
   }, []);
 
-  const load = useCallback(async (mode: "initial" | "refresh" = "initial") => {
-    if (mode === "initial") setLoading(true);
-    else setRefreshing(true);
+  const load = useCallback(async (mode: "initial" | "refresh" = "initial", targetCursor = cursor) => {
+    const cacheKey = `calendar_${targetCursor.year}_${targetCursor.month}`;
+    const cached = getCache<CalendarEvent[]>(cacheKey);
+
+    if (cached) {
+      setEvents(cached);
+      setLoading(false);
+    } else if (mode === "initial") {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
 
     try {
       const userId = pb.authStore.record?.id;
       if (!userId) return;
 
-      const filter = `user = "${userId}"`;
+      // Date range window: 1 month before cursor to 1 month after cursor (+-1 month buffer)
+      const startDate = new Date(targetCursor.year, targetCursor.month - 1, 1).toISOString().slice(0, 10);
+      const endDate = new Date(targetCursor.year, targetCursor.month + 2, 0).toISOString().slice(0, 10);
+
+      const taskFilter = `user = "${userId}" && due_date >= "${startDate}" && due_date <= "${endDate}"`;
+      const tripFilter = `user = "${userId}" && start_date <= "${endDate}"`;
+      const goalFilter = `user = "${userId}" && target_date >= "${startDate}" && target_date <= "${endDate}"`;
+      const expFilter = `user = "${userId}" && start_date <= "${endDate}"`;
+
       const [tasks, trips, goals, experiences] = await Promise.all([
-        pb.collection("life_planner").getFullList({ filter, sort: "due_date" }),
-        pb.collection("travel_trips").getFullList({ filter, sort: "start_date" }),
-        pb.collection("goals").getFullList({ filter, sort: "target_date" }),
-        pb.collection("experiences").getFullList({ filter, sort: "start_date" }),
+        pb.collection("life_planner").getFullList({
+          filter: taskFilter,
+          sort: "due_date",
+          fields: "id,title,due_date,status,priority,category",
+        }),
+        pb.collection("travel_trips").getFullList({
+          filter: tripFilter,
+          sort: "start_date",
+          fields: "id,name,destination,start_date,end_date,notes",
+        }),
+        pb.collection("goals").getFullList({
+          filter: goalFilter,
+          sort: "target_date",
+          fields: "id,name,target_date,target_amount,current_amount,status",
+        }),
+        pb.collection("experiences").getFullList({
+          filter: expFilter,
+          sort: "start_date",
+          fields: "id,name,start_date,end_date,location,type,status",
+        }),
       ]);
 
       const next: CalendarEvent[] = [];
@@ -210,6 +244,7 @@ export function Calendar() {
 
       next.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
       setEvents(next);
+      setCache(`calendar_${targetCursor.year}_${targetCursor.month}`, next, 60_000);
     } catch (error) {
       console.error("Failed to load calendar:", error);
       toast.error("Could not load the calendar.");
@@ -220,8 +255,8 @@ export function Calendar() {
   }, []);
 
   useEffect(() => {
-    void load("initial");
-  }, [load]);
+    void load("refresh", cursor);
+  }, [cursor.year, cursor.month, load]);
 
   const activeEvents = useMemo(
     () => events.filter((event) => visible[event.kind]),

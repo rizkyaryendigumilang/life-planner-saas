@@ -29,6 +29,9 @@ import {
 } from "../components/ui";
 import AddTransactionDialog from "../components/AddTransactionDialog";
 import ScanBillDialog from "../components/ScanBillDialog";
+import { BudgetOverviewCard } from "../components/BudgetOverviewCard";
+import { ManageBudgetsDialog } from "../components/ManageBudgetsDialog";
+import { getBudgets, type CategoryBudgets } from "../lib/budgets";
 import { formatIDR, formatDate } from "../lib/utils";
 import { toast } from "sonner";
 import { recycleBin } from "../lib/recycle-bin";
@@ -144,6 +147,29 @@ export function Finance() {
 
   const [deleteTarget, setDeleteTarget] =
     useState<Expense | null>(null);
+
+  const [budgets, setBudgets] = useState<CategoryBudgets>(() => getBudgets());
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const handleBudgetsUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<CategoryBudgets>).detail;
+      if (detail) setBudgets(detail);
+    };
+    window.addEventListener("life-planner:budgets-updated", handleBudgetsUpdated);
+    return () => window.removeEventListener("life-planner:budgets-updated", handleBudgetsUpdated);
+  }, []);
+
+  const categorySpending = useMemo(() => {
+    const map = new Map<string, number>();
+    items
+      .filter((item) => item.type === "Expense")
+      .forEach((item) => {
+        const cat = item.category || "Other";
+        map.set(cat, (map.get(cat) || 0) + Number(item.amount || 0));
+      });
+    return map;
+  }, [items]);
 
   /*
    * =========================================================
@@ -1064,6 +1090,22 @@ export function Finance() {
       </div>
 
       {/* =====================================================
+          BUDGET OVERVIEW
+          ===================================================== */}
+      <div className="mt-4">
+        <BudgetOverviewCard
+          budgets={budgets}
+          categorySpending={categorySpending}
+          selectedMonthLabel={
+            selectedMonth === "all"
+              ? "Semua Bulan"
+              : formatMonthLabel(selectedMonth)
+          }
+          onOpenManage={() => setBudgetDialogOpen(true)}
+        />
+      </div>
+
+      {/* =====================================================
           TRANSACTION TABLE
           ===================================================== */}
       <Card className="mt-4 overflow-hidden">
@@ -1400,6 +1442,14 @@ export function Finance() {
         onOpenChange={setScanOpen}
         bankAccounts={bankAccounts}
         onSaved={() => void load()}
+      />
+
+      <ManageBudgetsDialog
+        open={budgetDialogOpen}
+        onOpenChange={setBudgetDialogOpen}
+        currentBudgets={budgets}
+        categorySpending={categorySpending}
+        onSaved={(newBudgets) => setBudgets(newBudgets)}
       />
 
       {/* =====================================================

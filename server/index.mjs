@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import PocketBase from "pocketbase";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
@@ -9,6 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Readable } from "node:stream";
 
 const app = express();
 
@@ -70,6 +72,7 @@ const pb = new PocketBase(PB_URL);
 pb.autoCancellation(false);
 
 app.use(helmet());
+app.use(compression({ threshold: 1024 }));
 
 app.use(
   cors({
@@ -1393,6 +1396,34 @@ app.post(
    ADMIN
 ========================================================= */
 
+async function logAdminAction(
+  req,
+  { action, targetId = null, targetLabel = null, details = null } = {},
+) {
+  try {
+    await authenticatePocketBase();
+    const admin = req.authUser;
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket.remoteAddress ||
+      "";
+    const userAgent = req.headers["user-agent"] || "";
+
+    await pb.collection("admin_audit_logs").create({
+      admin_id: admin?.id || "unknown",
+      admin_email: admin?.email || "unknown",
+      action,
+      target_id: targetId,
+      target_label: targetLabel,
+      details: details ? details : null,
+      ip_address: ip,
+      user_agent: userAgent.slice(0, 500),
+    });
+  } catch (err) {
+    console.error("Failed to record admin audit log:", getPocketBaseError(err));
+  }
+}
+
 /* -----------------------------------------
    LIST USERS
 ----------------------------------------- */
@@ -1537,6 +1568,13 @@ app.post(
           // their temporary password.
           is_password_temp: true,
         });
+
+      await logAdminAction(req, {
+        action: "USER_CREATE",
+        targetId: user.id,
+        targetLabel: user.email || user.username,
+        details: { role: user.role, status: user.status },
+      });
 
       return res.status(201).json({
         success: true,
@@ -1726,6 +1764,10 @@ app.patch(
           data.is_password_temp;
       }
 
+      if (data.status === "suspended" || data.password) {
+        updateData.tokenKey = randomBytes(30).toString("base64url");
+      }
+
       const user = await pb
         .collection(
           "_pb_users_auth_",
@@ -1734,6 +1776,31 @@ app.patch(
           req.params.id,
           updateData,
         );
+
+      if (data.status === "suspended") {
+        try {
+          const tokens = await pb.collection("shortcut_tokens").getFullList({
+            filter: `user = "${escapeFilterValue(req.params.id)}" && revoked = false`,
+          });
+          for (const t of tokens) {
+            await pb.collection("shortcut_tokens").update(t.id, { revoked: true });
+          }
+        } catch (tokenErr) {
+          console.warn("Could not revoke shortcut tokens on suspension:", tokenErr);
+        }
+      }
+
+      await logAdminAction(req, {
+        action:
+          data.status === "suspended"
+            ? "USER_SUSPEND"
+            : data.password
+              ? "USER_PASSWORD_CHANGE"
+              : "USER_UPDATE",
+        targetId: user.id,
+        targetLabel: user.email || user.username,
+        details: { updatedFields: Object.keys(updateData) },
+      });
 
       return res.json({
         success: true,
@@ -1810,6 +1877,12 @@ app.delete(
           req.params.id,
         );
 
+      await logAdminAction(req, {
+        action: "USER_DELETE",
+        targetId: req.params.id,
+        targetLabel: req.params.id,
+      });
+
       return res.json({
         success: true,
         message:
@@ -1832,6 +1905,413 @@ app.delete(
     }
   },
 );
+
+
+/* -----------------------------------------
+   ADMIN AUDIT LOGS
+----------------------------------------- */
+
+app.get("/api/admin/audit-logs", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const perPage = Math.min(100, Math.max(10, Number(req.query.perPage) || 30));
+    let filter = "";
+    if (req.query.action && typeof req.query.action === "string" && req.query.action.trim()) {
+      filter = `action = "${escapeFilterValue(req.query.action.trim())}"`;
+    }
+
+    const result = await pb.collection("admin_audit_logs").getList(page, perPage, {
+      sort: "-created",
+      filter: filter || undefined,
+    });
+
+    return res.json({
+      success: true,
+      items: result.items,
+      page: result.page,
+      perPage: result.perPage,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
+    });
+  } catch (error) {
+    console.error("Admin list audit logs error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Could not load audit logs." });
+  }
+});
+
+/* -----------------------------------------
+   FORCE REVOKE / INSTANT INVALIDATE SESSIONS
+----------------------------------------- */
+
+app.post("/api/admin/users/:id/revoke-sessions", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+
+    const targetUser = await pb.collection("_pb_users_auth_").getOne(req.params.id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    // 1. Invalidate PocketBase JWT sessions by regenerating tokenKey
+    const newTokenKey = randomBytes(30).toString("base64url");
+    await pb.collection("_pb_users_auth_").update(targetUser.id, {
+      tokenKey: newTokenKey,
+    });
+
+    // 2. Revoke all shortcut device tokens
+    let revokedTokensCount = 0;
+    try {
+      const tokens = await pb.collection("shortcut_tokens").getFullList({
+        filter: `user = "${escapeFilterValue(targetUser.id)}" && revoked = false`,
+      });
+      for (const t of tokens) {
+        await pb.collection("shortcut_tokens").update(t.id, { revoked: true });
+        revokedTokensCount++;
+      }
+    } catch (tokenErr) {
+      console.warn("Could not revoke shortcut tokens:", tokenErr);
+    }
+
+    await logAdminAction(req, {
+      action: "USER_REVOKE_SESSIONS",
+      targetId: targetUser.id,
+      targetLabel: targetUser.email || targetUser.username,
+      details: { revokedTokensCount },
+    });
+
+    return res.json({
+      success: true,
+      message: `Semua sesi aktif untuk "${targetUser.username}" berhasil dicabut. Pengguna harus login kembali.`,
+      revokedTokensCount,
+    });
+  } catch (error) {
+    console.error("Revoke sessions error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Gagal mencabut sesi pengguna." });
+  }
+});
+
+/* -----------------------------------------
+   SEND PASSWORD RESET EMAIL (VIA POCKETBASE SMTP)
+----------------------------------------- */
+
+app.post("/api/admin/users/:id/send-reset-email", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+
+    const targetUser = await pb.collection("_pb_users_auth_").getOne(req.params.id);
+    if (!targetUser || !targetUser.email) {
+      return res.status(400).json({ success: false, message: "Pengguna tidak memiliki alamat email yang valid." });
+    }
+
+    await pb.collection("users").requestPasswordReset(targetUser.email);
+
+    await logAdminAction(req, {
+      action: "PASSWORD_RESET_SENT",
+      targetId: targetUser.id,
+      targetLabel: targetUser.email,
+    });
+
+    return res.json({
+      success: true,
+      message: `Instruksi reset kata sandi telah dikirim ke ${targetUser.email}.`,
+    });
+  } catch (error) {
+    console.error("Send password reset email error:", getPocketBaseError(error));
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        "Gagal mengirim email reset kata sandi. Pastikan konfigurasi SMTP aktif.",
+    });
+  }
+});
+
+/* -----------------------------------------
+   DATABASE BACKUPS (1-CLICK SNAPSHOT)
+----------------------------------------- */
+
+app.get("/api/admin/backups", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+    const list = await pb.backups.getFullList();
+
+    return res.json({
+      success: true,
+      backups: list.map((item) => ({
+        key: item.key,
+        size: item.size,
+        modified: item.modified,
+      })),
+    });
+  } catch (error) {
+    console.error("Admin list backups error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Could not load backups." });
+  }
+});
+
+app.post("/api/admin/backups", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+
+    const now = new Date();
+    const dateStr = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const backupName = `backup_${dateStr}.zip`;
+
+    await pb.backups.create(backupName);
+
+    await logAdminAction(req, {
+      action: "BACKUP_CREATE",
+      targetLabel: backupName,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Snapshot cadangan "${backupName}" berhasil dibuat.`,
+      backupName,
+    });
+  } catch (error) {
+    console.error("Admin create backup error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Gagal membuat snapshot backup database." });
+  }
+});
+
+app.delete("/api/admin/backups/:key", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+    const key = req.params.key;
+
+    await pb.backups.delete(key);
+
+    await logAdminAction(req, {
+      action: "BACKUP_DELETE",
+      targetLabel: key,
+    });
+
+    return res.json({
+      success: true,
+      message: `File backup "${key}" berhasil dihapus.`,
+    });
+  } catch (error) {
+    console.error("Admin delete backup error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Gagal menghapus file backup." });
+  }
+});
+
+app.get("/api/admin/backups/:key/download", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+    const key = req.params.key;
+    const fileToken = await pb.files.getToken();
+    const downloadUrl = pb.backups.getDownloadURL(fileToken, key);
+
+    const pbRes = await fetch(downloadUrl);
+    if (!pbRes.ok) {
+      throw new Error(`PocketBase download failed with status ${pbRes.status}`);
+    }
+
+    res.setHeader("Content-Disposition", `attachment; filename="${key}"`);
+    res.setHeader("Content-Type", pbRes.headers.get("content-type") || "application/zip");
+
+    if (pbRes.body) {
+      Readable.fromWeb(pbRes.body).pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    console.error("Admin download backup error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Gagal mengunduh file backup." });
+  }
+});
+
+/* -----------------------------------------
+   SMTP & EMAIL CONFIGURATION
+----------------------------------------- */
+
+app.get("/api/admin/settings/mail", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    await authenticatePocketBase();
+    const settings = await pb.settings.getAll();
+
+    return res.json({
+      success: true,
+      smtp: {
+        enabled: Boolean(settings.smtp?.enabled),
+        host: settings.smtp?.host || "",
+        port: Number(settings.smtp?.port) || 587,
+        username: settings.smtp?.username || "",
+        authMethod: settings.smtp?.authMethod || "PLAIN",
+        tls: Boolean(settings.smtp?.tls),
+        hasPassword: Boolean(settings.smtp?.password),
+      },
+      meta: {
+        senderName: settings.meta?.senderName || "Life Planner",
+        senderAddress: settings.meta?.senderAddress || "noreply@lifeplanner.local",
+      },
+    });
+  } catch (error) {
+    console.error("Admin get mail settings error:", getPocketBaseError(error));
+    return res.status(500).json({ success: false, message: "Could not load mail settings." });
+  }
+});
+
+const mailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string().trim(),
+  port: z.number().int().min(1).max(65535),
+  username: z.string().trim(),
+  password: z.string().optional(),
+  authMethod: z.enum(["PLAIN", "LOGIN"]).default("PLAIN"),
+  tls: z.boolean(),
+  senderName: z.string().trim().min(1),
+  senderAddress: z.string().trim().email(),
+});
+
+app.patch("/api/admin/settings/mail", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const parsed = mailSettingsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid mail settings data.",
+        errors: parsed.error.flatten(),
+      });
+    }
+
+    await authenticatePocketBase();
+    const currentSettings = await pb.settings.getAll();
+    const data = parsed.data;
+
+    const newSmtp = {
+      enabled: data.enabled,
+      host: data.host,
+      port: data.port,
+      username: data.username,
+      password:
+        data.password !== undefined && data.password !== ""
+          ? data.password
+          : currentSettings.smtp?.password || "",
+      authMethod: data.authMethod,
+      tls: data.tls,
+    };
+
+    const newMeta = {
+      ...(currentSettings.meta || {}),
+      senderName: data.senderName,
+      senderAddress: data.senderAddress,
+    };
+
+    await pb.settings.update({
+      smtp: newSmtp,
+      meta: newMeta,
+    });
+
+    await logAdminAction(req, {
+      action: "SMTP_UPDATE",
+      targetLabel: data.senderAddress,
+      details: { host: data.host, port: data.port, enabled: data.enabled },
+    });
+
+    return res.json({
+      success: true,
+      message: "Pengaturan SMTP dan email berhasil disimpan.",
+      smtp: {
+        ...newSmtp,
+        password: undefined,
+        hasPassword: Boolean(newSmtp.password),
+      },
+      meta: {
+        senderName: newMeta.senderName,
+        senderAddress: newMeta.senderAddress,
+      },
+    });
+  } catch (error) {
+    console.error("Admin update mail settings error:", getPocketBaseError(error));
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        "Gagal memperbarui pengaturan SMTP.",
+    });
+  }
+});
+
+app.post("/api/admin/settings/mail/test", async (req, res) => {
+  try {
+    if (!(await isAdminAuthorized(req))) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const targetEmail = String(req.body?.email || "").trim();
+    if (!targetEmail || !targetEmail.includes("@")) {
+      return res.status(400).json({
+        success: false,
+        message: "Alamat email penerima uji coba tidak valid.",
+      });
+    }
+
+    await authenticatePocketBase();
+    await pb.settings.testEmail(targetEmail, "verification");
+
+    await logAdminAction(req, {
+      action: "SMTP_TEST",
+      targetLabel: targetEmail,
+    });
+
+    return res.json({
+      success: true,
+      message: `Email uji coba berhasil dikirim ke "${targetEmail}". Silakan periksa kotak masuk/spam.`,
+    });
+  } catch (error) {
+    console.error("Admin test mail error:", getPocketBaseError(error));
+    return res.status(500).json({
+      success: false,
+      message:
+        error?.response?.data?.message ||
+        error?.message ||
+        "Pengiriman email uji coba gagal. Periksa konfigurasi host, port, username, atau password SMTP Anda.",
+    });
+  }
+});
 
 /* =========================================================
    ACCOUNT SIGN-UP
@@ -2112,7 +2592,7 @@ app.get("/shortcut/life-planner-expense.shortcut", (_req, res) => {
 });
 
 /* =========================================================
-   404
+   404 & Static Assets Serving
 ========================================================= */
 
 app.use(
@@ -2124,6 +2604,34 @@ app.use(
     });
   },
 );
+
+// In production, serve the compiled Vite frontend with optimal caching headers
+const distPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist");
+if (fs.existsSync(distPath)) {
+  app.use(
+    express.static(distPath, {
+      maxAge: "1h",
+      setHeaders(res, filePath) {
+        if (filePath.includes(path.join("", "assets")) || filePath.includes("/assets/")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith("index.html") || filePath.endsWith("sw.js")) {
+          res.setHeader("Cache-Control", "no-cache, must-revalidate");
+        }
+      },
+    }),
+  );
+
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/shortcuts")) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, "index.html"), {
+      headers: {
+        "Cache-Control": "no-cache, must-revalidate",
+      },
+    });
+  });
+}
 
 // Keep CORS and unexpected API failures in a JSON shape; do not leak stack traces.
 app.use((error, _req, res, _next) => {
