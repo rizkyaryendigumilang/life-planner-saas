@@ -2423,23 +2423,47 @@ app.get("/api/auth/providers", async (_req, res) => {
 
 /* ----- Telegram sign-in (bot handshake, so no domain is required) ----- */
 
-async function telegramApi(method, payload) {
+async function telegramApi(method, payload, timeoutMs = 15000) {
   const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload || {}),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   return response.json();
+}
+
+// Telegram is a third-party API: a cold DNS lookup or a dropped IPv6 route can
+// make fetch fail for a moment. Treat those as "temporarily unavailable"
+// instead of a server bug, and retry the cheap calls once.
+function isTelegramNetworkError(error) {
+  return (
+    error?.name === "TimeoutError" ||
+    error?.name === "AbortError" ||
+    error?.message === "fetch failed" ||
+    ["ETIMEDOUT", "ENETUNREACH", "EAI_AGAIN", "ECONNRESET", "ECONNREFUSED"].includes(
+      error?.cause?.code,
+    )
+  );
 }
 
 let telegramBot = null;
 async function getTelegramBot() {
   if (telegramBot) return telegramBot;
   if (!TELEGRAM_BOT_TOKEN) return null;
-  const body = await telegramApi("getMe", {});
-  if (!body?.ok) return null;
-  telegramBot = body.result;
-  return telegramBot;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const body = await telegramApi("getMe", {}, 10000);
+      if (!body?.ok) return null;
+      telegramBot = body.result;
+      return telegramBot;
+    } catch (error) {
+      if (attempt === 1 || !isTelegramNetworkError(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  return null;
 }
 
 // One long-poll loop serves every pending sign-in, so Telegram is only asked
@@ -2453,11 +2477,15 @@ async function telegramUpdateLoop() {
 
   try {
     while (telegramLogins.size > 0) {
-      const body = await telegramApi("getUpdates", {
-        offset: telegramOffset,
-        timeout: 20,
-        allowed_updates: ["message"],
-      });
+      const body = await telegramApi(
+        "getUpdates",
+        {
+          offset: telegramOffset,
+          timeout: 20,
+          allowed_updates: ["message"],
+        },
+        35000,
+      );
 
       if (!body?.ok) {
         await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -2541,6 +2569,11 @@ app.post("/api/auth/telegram/start", rateLimit({ windowMs: 60 * 1000, max: 20 })
     });
   } catch (error) {
     console.error("Telegram start error:", error);
+    if (isTelegramNetworkError(error)) {
+      return res
+        .status(503)
+        .json({ success: false, message: "Telegram is temporarily unreachable. Please try again." });
+    }
     return res.status(500).json({ success: false, message: "Could not start the Telegram sign-in." });
   }
 });
