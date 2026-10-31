@@ -229,6 +229,12 @@ https://api.example.com  -> PocketBase
 
 Use HTTPS for both.
 
+This repository also ships an automated pipeline: pushing to `main` builds and
+deploys the frontend **and** the Express API, PocketBase hooks and migrations,
+then restarts the services and runs health checks. See
+[`docs/DEPLOY-VPS-ID.md`](docs/DEPLOY-VPS-ID.md) for the required GitHub
+secrets, the expected VPS layout and the rollback behaviour.
+
 ## 9. Project structure
 
 ```text

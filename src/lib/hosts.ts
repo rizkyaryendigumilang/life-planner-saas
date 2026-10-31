@@ -58,5 +58,23 @@ export function resolveHost(configured: string | undefined, fallback: string) {
   }
 }
 
+// Addresses like these only work on the same network, never from a phone using
+// mobile data. Used to decide whether a feed URL is truly reachable anywhere.
+const PRIVATE_HOST = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|fc|fd|fe80)/i;
+
+export function isPublicHttpsBase(value: string) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.replace(/^\[|\]$/g, "");
+    if (!host || LOOPBACK_HOSTS.has(host)) return false;
+    if (PRIVATE_HOST.test(host)) return false;
+    if (host.endsWith(".local") || host.endsWith(".internal")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const API_BASE = resolveHost(import.meta.env.VITE_API_BASE_URL, "http://127.0.0.1:3001");
 export const POCKETBASE_BASE = resolveHost(import.meta.env.VITE_POCKETBASE_URL, "http://127.0.0.1:8090");

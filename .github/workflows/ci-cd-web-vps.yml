@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'public/**'
       - 'server/**'
+      - 'pocketbase/**'
       - 'scripts/**'
       - 'index.html'
       - 'package.json'
@@ -22,6 +23,7 @@ on:
       - 'src/**'
       - 'public/**'
       - 'server/**'
+      - 'pocketbase/**'
       - 'scripts/**'
       - 'index.html'
       - 'package.json'
@@ -350,3 +352,218 @@ jobs:
             exit 1
           fi
           ROLLBACK
+
+  deploy-backend:
+    name: Deploy API, PocketBase hooks and migrations
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_vps != false))
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets and configure verified SSH
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
+          VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_SSH_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          missing=""
+          [ -n "${VPS_HOST:-}" ] || missing="$missing VPS_HOST"
+          [ -n "${VPS_USER:-}" ] || missing="$missing VPS_USERNAME"
+          [ -n "${VPS_KEY:-}" ] || missing="$missing VPS_SSH_KEY"
+          [ -n "${VPS_SSH_KNOWN_HOSTS:-}" ] || missing="$missing VPS_SSH_KNOWN_HOSTS"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Backend deployment cannot proceed. Missing required secret(s):$missing."
+            exit 1
+          fi
+
+          if [ "$VPS_USER" = "root" ]; then
+            echo "::error::Deployment policy violation: deployment must not use user 'root'."
+            exit 1
+          fi
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          echo "✓ SSH configuration verified."
+
+      - name: Package backend files
+        run: |
+          set -euo pipefail
+          tar -czf backend.tar.gz server pocketbase/pb_hooks pocketbase/pb_migrations scripts package.json package-lock.json
+          echo "✓ Backend bundle created ($(du -h backend.tar.gz | cut -f1))."
+
+      - name: Upload backend bundle to VPS
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./backend.tar.gz "$VPS_USER@$VPS_HOST:life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+
+      - name: Install and restart services on VPS
+        id: backend
+        env:
+          VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR || '/home/ubuntu/platform-repos/life-planner-saas' }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_BACKEND_DIR' 'life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz' '${GITHUB_SHA}'" <<'REMOTE'
+          set -Eeuo pipefail
+
+          dir="$1"
+          bundle="$2"
+          release="$3"
+
+          case "$dir" in
+            /home/ubuntu/*) ;;
+            *) echo "::error::VPS_BACKEND_DIR must live under /home/ubuntu, received: $dir"; exit 1 ;;
+          esac
+          [[ "$release" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Invalid release SHA"; exit 1; }
+          test -d "$dir" || { echo "::error::Backend directory not found: $dir"; exit 1; }
+          test -f "$dir/server/index.mjs" || { echo "::error::Missing $dir/server/index.mjs"; exit 1; }
+          test -d "$dir/pocketbase/pb_migrations" || { echo "::error::Missing migrations directory"; exit 1; }
+
+          stamp=$(date -u +%Y%m%d-%H%M%S)
+          parent="$HOME/.deploy-life-planner-backend"
+          mkdir -p "$parent"
+          stage="$parent/stage-$stamp"
+          backup="$parent/backend-$stamp.tar.gz"
+          mkdir -p "$stage"
+
+          # 1. Keep the previous files so any failure can be reverted.
+          tar -czf "$backup" -C "$dir" server pocketbase/pb_hooks pocketbase/pb_migrations scripts
+          db="/srv/life-planner/pb_data/data.db"
+          if sudo -n test -f "$db"; then
+            sudo -n cp "$db" "$parent/data-$stamp.db"
+            sudo -n chown "$(id -u):$(id -g)" "$parent/data-$stamp.db" || true
+          fi
+
+          rollback() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              echo "::error::Backend deploy failed. Restoring previous files..."
+              for file in $added_files; do
+                rm -f "$dir/pocketbase/pb_migrations/$(basename "$file")"
+              done
+              rm -rf "$stage"
+              tar -xzf "$backup" -C "$dir" || true
+              sudo -n systemctl restart life-planner-pocketbase.service life-planner-api.service || true
+            fi
+            exit "$status"
+          }
+          added_files=""
+          trap rollback ERR
+
+          # 2. Unpack the new files next to the live tree.
+          tar -xzf "$HOME/$bundle" -C "$stage"
+          test -f "$stage/server/index.mjs" || { echo "Bundle missing server/index.mjs"; exit 1; }
+
+          old_lock=$(sha256sum "$dir/package-lock.json" | cut -d' ' -f1)
+
+          rm -rf "$dir/server" "$dir/scripts" "$dir/pocketbase/pb_hooks"
+          mv "$stage/server" "$dir/server"
+          mv "$stage/scripts" "$dir/scripts"
+          mv "$stage/pocketbase/pb_hooks" "$dir/pocketbase/pb_hooks"
+          cp "$stage/package.json" "$dir/package.json"
+          cp "$stage/package-lock.json" "$dir/package-lock.json"
+
+          # 3. Merge migrations without renaming, deleting, or duplicating the
+          #    existing ones: PocketBase tracks applied migrations by file name,
+          #    and some VPS files carry a slightly different timestamp than the
+          #    repository copy while having identical content.
+          shopt -s nullglob
+          existing_hashes=$(sha256sum "$dir"/pocketbase/pb_migrations/*.js 2>/dev/null | cut -d' ' -f1 || true)
+          added=0
+          for file in "$stage"/pocketbase/pb_migrations/*.js; do
+            name=$(basename "$file")
+            [ -e "$dir/pocketbase/pb_migrations/$name" ] && continue
+            hash=$(sha256sum "$file" | cut -d' ' -f1)
+            if printf '%s\n' "$existing_hashes" | grep -qx "$hash"; then
+              echo "Skipping $name: identical content already exists under another name."
+              continue
+            fi
+            cp "$file" "$dir/pocketbase/pb_migrations/$name"
+            existing_hashes="$existing_hashes"$'\n'"$hash"
+            added_files="$added_files $name"
+            added=$((added + 1))
+          done
+          echo "New migrations: $added"
+
+          # 4. Install dependencies only when package-lock.json changed.
+          new_lock=$(sha256sum "$dir/package-lock.json" | cut -d' ' -f1)
+          if [ "$old_lock" != "$new_lock" ]; then
+            echo "package-lock.json changed; installing production dependencies..."
+            (cd "$dir" && npm ci --omit=dev --no-audit --no-fund)
+          fi
+
+          # 5. Restart PocketBase first so pending migrations are applied,
+          #    then the API that depends on it.
+          sudo -n systemctl restart life-planner-pocketbase.service
+          pb_ok=0
+          for _ in $(seq 1 45); do
+            if curl -fsS -m 2 http://127.0.0.1:8091/api/health >/dev/null 2>&1; then pb_ok=1; break; fi
+            sleep 1
+          done
+          [ "$pb_ok" -eq 1 ] || { echo "PocketBase did not become healthy after restart"; exit 1; }
+
+          sudo -n systemctl restart life-planner-api.service
+          api_ok=0
+          for _ in $(seq 1 45); do
+            if curl -fsS -m 2 http://127.0.0.1:3001/api/health >/dev/null 2>&1; then api_ok=1; break; fi
+            sleep 1
+          done
+          [ "$api_ok" -eq 1 ] || { echo "Express API did not become healthy after restart"; exit 1; }
+          curl -fsS -m 5 http://127.0.0.1:3001/api/auth/providers >/dev/null || { echo "Signup provider route is not responding"; exit 1; }
+
+          rm -rf "$stage"
+          rm -f "$HOME/$bundle"
+          trap - ERR
+
+          # 6. Retain the five newest backups of each kind.
+          ls -1t "$parent"/backend-*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f
+          ls -1t "$parent"/data-*.db 2>/dev/null | tail -n +6 | xargs -r rm -f
+
+          echo "Backend deployed at $release; rollback archive: $backup"
+          REMOTE
+
+      - name: Verify production backend
+        env:
+          API_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL || 'https://43.156.236.102/life-planner-api' }}
+          PB_URL: ${{ vars.VITE_POCKETBASE_URL || secrets.VITE_POCKETBASE_URL || 'https://43.156.236.102/life-planner-pb' }}
+        run: |
+          set -euo pipefail
+          API_BASE="${API_URL%/}"
+          PB_BASE="${PB_URL%/}"
+
+          api_ok=0
+          for i in $(seq 1 6); do
+            health=$(curl -sSf -m 10 "$API_BASE/api/health" 2>/dev/null || true)
+            providers=$(curl -sSf -m 10 "$API_BASE/api/auth/providers" 2>/dev/null || true)
+            if echo "$health" | grep -q '"status":"ok"' && echo "$providers" | grep -q '"success":true'; then
+              api_ok=1
+              break
+            fi
+            echo "Attempt $i failed; retrying in 4s..."
+            sleep 4
+          done
+          [ "$api_ok" -eq 1 ] || { echo "::error::Public API health check failed after backend deploy."; exit 1; }
+          echo "✓ Public API and signup providers healthy."
+
+          pb_resp=$(curl -sSf -m 10 "$PB_BASE/api/health" 2>/dev/null || true)
+          echo "$pb_resp" | grep -q '"code":200' || { echo "::error::Public PocketBase health check failed."; exit 1; }
+          echo "✓ Public PocketBase healthy."

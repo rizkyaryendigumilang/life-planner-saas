@@ -19,6 +19,7 @@ const API_HOST = process.env.API_HOST || "0.0.0.0";
 const PB_URL = process.env.PB_URL || "http://127.0.0.1:8090";
 
 const SUPERUSER_EMAIL = process.env.PB_SUPERUSER_EMAIL;
+const SUPERUSER_PASSWORD = process.env.PB_SUPERUSER_PASSWORD;
 const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173")
   .split(",")
   .map((value) => value.trim())
@@ -2621,7 +2622,9 @@ if (fs.existsSync(distPath)) {
     }),
   );
 
-  app.get("*", (req, res, next) => {
+  // Express 5 (path-to-regexp v8) rejects the bare "*" pattern; a RegExp
+  // keeps the SPA fallback working for every GET request.
+  app.get(/.*/, (req, res, next) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/shortcuts")) {
       return next();
     }

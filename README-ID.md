@@ -16,6 +16,8 @@ Paket ini berisi source code frontend React/Vite, backend Express, migration Poc
 - Integrasi Shortcut iOS dengan token khusus per perangkat: server hanya menyimpan SHA-256 hash; token mentah hanya dikembalikan sekali; token bisa dicabut dan kedaluwarsa.
 - Portfolio hanya menampilkan quote jika backend memperoleh data nyata dari Twelve Data; harga tidak dibuat-buat, key provider disimpan di server, respons quote di-cache 60 detik, dan permintaan dibatasi per user/IP.
 - Audit checker schema/rules PocketBase: `npm run audit:pb`.
+- Deploy otomatis: push ke `main` membangun frontend, lalu mengirim frontend, API, hooks, dan migration ke VPS, menyalakan ulang service, dan menjalankan health check. Detail dan daftar secret ada di `docs/DEPLOY-VPS-ID.md`.
+- `npm test` menjalankan smoke test yang benar-benar menyalakan API dan menunggu `/api/health`, sehingga error saat startup (variabel hilang, route Express tidak valid) gagal di CI.
 
 ## Folder penting
 
@@ -50,7 +52,7 @@ Paket ini berisi source code frontend React/Vite, backend Express, migration Poc
 
 7. Di terminal backend: `npm run api:dev`. Di terminal frontend lain: `npm run dev`.
 8. Login dengan akun customer dan admin terpisah. Jalankan `npm run audit:pb` setelah konfigurasi `.env`.
-9. Ikuti `docs/AUTH-SETUP-ID.md`, `docs/CALENDAR-SUBSCRIBE-ID.md`, `docs/IOS-SHORTCUT-SETUP-ID.md`, lalu `docs/TEST-PLAN-ID.md`.
+9. Ikuti `docs/AUTH-SETUP-ID.md`, `docs/DEPLOY-VPS-ID.md`, `docs/CALENDAR-SUBSCRIBE-ID.md`, `docs/IOS-SHORTCUT-SETUP-ID.md`, lalu `docs/TEST-PLAN-ID.md`.
 
 ## Environment variable
 

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { Badge, Button, Card, Skeleton } from "../components/ui";
-import { API_BASE } from "../lib/hosts";
+import { API_BASE, isPublicHttpsBase } from "../lib/hosts";
 import { pb } from "../lib/pocketbase";
 import { getCache, setCache } from "../lib/swr-cache";
 
@@ -102,10 +102,10 @@ export function Calendar() {
   const [selected, setSelected] = useState(() => dateKey(new Date()));
   const [downloading, setDownloading] = useState(false);
   // The feed is opened by the phone, so the URL has to use an address the
-  // phone can reach. The API prefers the public tunnel URL when one is up,
-  // and falls back to the machine's LAN address otherwise.
+  // phone can reach. Prefer the public tunnel, then an already-public API
+  // origin (VPS behind HTTPS), and only then the machine's LAN address.
   const [feedBase, setFeedBase] = useState(API_BASE);
-  const [feedPublic, setFeedPublic] = useState(false);
+  const [feedPublic, setFeedPublic] = useState(() => isPublicHttpsBase(API_BASE));
   const [feedLanUrl, setFeedLanUrl] = useState("");
 
   const today = useMemo(() => dateKey(new Date()), []);
@@ -119,9 +119,21 @@ export function Calendar() {
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
         if (!active || !body) return;
-        if (body.url) setFeedBase(body.url);
-        setFeedPublic(Boolean(body.reachableFromInternet));
-        setFeedLanUrl(String(body.lanUrl || ""));
+        const publicUrl = String(body.publicUrl || "");
+        const lanUrl = String(body.lanUrl || "");
+        if (publicUrl) {
+          setFeedBase(publicUrl);
+          setFeedPublic(true);
+        } else if (isPublicHttpsBase(API_BASE)) {
+          // Deployed behind HTTPS: the app's own origin is already reachable
+          // from anywhere, so a LAN/tunnel address would be a downgrade.
+          setFeedBase(API_BASE);
+          setFeedPublic(true);
+        } else if (lanUrl) {
+          setFeedBase(lanUrl);
+          setFeedPublic(false);
+        }
+        setFeedLanUrl(lanUrl);
       })
       .catch(() => {
         /* keep the configured base when the address cannot be read */

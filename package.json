@@ -9,7 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "api:dev": "node server/index.mjs",
-    "test": "node --check server/index.mjs",
+    "test": "node --check server/index.mjs && node --check pocketbase/pb_hooks/life_planner_auth.pb.js && node scripts/smoke-api.mjs",
     "tunnel": "node scripts/tunnel.mjs",
     "setup:oauth": "node scripts/setup-oauth.mjs",
     "typecheck": "tsc --noEmit",
