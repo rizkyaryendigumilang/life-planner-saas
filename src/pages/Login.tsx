@@ -261,13 +261,48 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
     }
 
     setBusy(true);
+
+    // PocketBase finishes OAuth2 by posting the code back from the pop-up, so
+    // the promise only settles if the user completes the flow. Watch the pop-up
+    // ourselves: closing it (or abandoning it) must return the form to a usable
+    // state instead of leaving every button disabled forever.
+    let popup: Window | null = null;
+    let closedSince: number | null = null;
+    let guardTimer = 0;
+    const startedAt = Date.now();
+    const guard = new Promise<never>((_, reject) => {
+      guardTimer = window.setInterval(() => {
+        if (popup && popup.closed) {
+          if (closedSince === null) closedSince = Date.now();
+          if (Date.now() - closedSince > 1500) {
+            window.clearInterval(guardTimer);
+            reject(new Error("The sign-in window was closed. Please try again."));
+          }
+          return;
+        }
+        if (Date.now() - startedAt > 5 * 60 * 1000) {
+          window.clearInterval(guardTimer);
+          reject(new Error("The sign-in timed out. Please try again."));
+        }
+      }, 700);
+    });
+
     try {
-      const result = await pb.collection("users").authWithOAuth2({ provider: entry.name });
+      const result = await Promise.race([
+        pb.collection("users").authWithOAuth2({
+          provider: entry.name,
+          urlCallback: (url: string) => {
+            popup = window.open(url, "life-planner-oauth", "width=520,height=680");
+            if (!popup) window.location.href = url;
+          },
+        }),
+        guard,
+      ]);
       if (!validateActiveUser(result.record)) return;
       toast.success(`Signed in with ${label}.`);
       onAuthenticated();
     } catch (error) { toast.error(friendlyError(error)); }
-    finally { setBusy(false); }
+    finally { window.clearInterval(guardTimer); setBusy(false); }
   }
 
   async function telegramLogin() {
