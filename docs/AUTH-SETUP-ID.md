@@ -79,7 +79,56 @@ Catatan:
 
 Halaman login menanyakan `GET /api/auth/providers` (tanpa autentikasi). Endpoint itu melaporkan `google`, `github`, dan `telegram` mana yang benar-benar siap. Tombol yang belum dikonfigurasi tetap tampil, tapi redup dan memberi pesan jelas saat diklik.
 
-## 5. Catatan account linking
+## 5. Production (VPS)
+
+Nilai produksi yang dipakai saat ini:
+
+| Item | Nilai |
+| --- | --- |
+| Frontend | `https://43.156.236.102/life-planner/` |
+| API | `https://43.156.236.102/life-planner-api` |
+| PocketBase | `https://43.156.236.102/life-planner-pb` |
+| Redirect OAuth (GitHub/Google) | `https://43.156.236.102/life-planner-pb/api/oauth2-redirect` |
+
+File environment API ada di `/etc/life-planner/api.env` (root only, `600`), sudah
+berisi slot kosong:
+
+```env
+TELEGRAM_BOT_TOKEN=
+```
+
+Cara mengisi token Telegram:
+
+```bash
+sudo -n nano /etc/life-planner/api.env     # tempel token setelah '='
+sudo -n systemctl restart life-planner-api
+curl -s https://43.156.236.102/life-planner-api/api/auth/providers
+```
+
+Hasil yang diharapkan: `"telegram":true`.
+
+Cara mengisi GitHub (OAuth2, bukan lewat file env VPS):
+
+1. Buka <https://github.com/settings/developers> → **New OAuth App**.
+2. Application name: bebas, mis. `Life Planner`.
+3. Homepage URL: `https://43.156.236.102/life-planner/`.
+4. Authorization callback URL: `https://43.156.236.102/life-planner-pb/api/oauth2-redirect`.
+5. Salin **Client ID**, lalu **Generate a new client secret** dan salin secret-nya.
+6. Jalankan dari checkout di VPS:
+
+```bash
+cd /home/ubuntu/platform-repos/life-planner-saas
+PB_URL=http://127.0.0.1:8091 \
+GITHUB_CLIENT_ID=... GITHUB_CLIENT_SECRET=... \
+PB_SUPERUSER_EMAIL=... PB_SUPERUSER_PASSWORD=... \
+npm run setup:oauth
+sudo -n systemctl restart life-planner-api
+```
+
+Konfigurasi OAuth disimpan di database PocketBase, jadi tidak hilang saat deploy
+berikutnya. Yang perlu diulang hanya bila client ID/secret diganti.
+
+## 6. Catatan account linking
 
 PocketBase dapat menghubungkan provider OAuth dengan akun yang mempunyai email yang sama, tergantung data provider. Uji setiap skenario menggunakan akun test yang terpisah. Jangan pernah mengaktifkan auto-link berbasis email yang tidak diverifikasi oleh provider. Jangan mengubah role menjadi `superadmin` melalui `createData` frontend; hook server memaksa akun baru menjadi `customer`.
 
