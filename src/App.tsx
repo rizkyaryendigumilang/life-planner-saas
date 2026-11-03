@@ -5,6 +5,7 @@ import { ThemeProvider, useTheme } from "./hooks/use-theme";
 import { useCapacitor } from "./hooks/use-capacitor";
 import { Login } from "./pages/Login";
 import { AppShell, type Page } from "./components/layout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toaster, toast } from "sonner";
 
 // Lazy-loaded pages for optimal bundle size & fast startup
@@ -100,9 +101,11 @@ function Workspace() {
         toast.success("Kamu sudah keluar dengan aman.");
       }}
     >
-      <Suspense fallback={<PageFallback />}>
-        {content}
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<PageFallback />}>
+          {content}
+        </Suspense>
+      </ErrorBoundary>
       {toaster}
     </AppShell>
   );

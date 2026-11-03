@@ -11,7 +11,8 @@
     --c-muted: 245 245 246;
     --c-ink: 23 23 27;
     --c-ink-soft: 108 108 117;
-    --c-ink-faint: 150 150 160;
+    /* Elevated contrast to satisfy WCAG AA >=4.5:1 for small captions and subtexts */
+    --c-ink-faint: 112 112 122;
     --c-line: 16 16 20;
     --c-accent: 23 23 27;
     --c-accent-ink: 255 255 255;
@@ -33,7 +34,8 @@
     --c-muted: 27 27 32;
     --c-ink: 244 244 245;
     --c-ink-soft: 161 161 170;
-    --c-ink-faint: 113 113 122;
+    /* Elevated contrast to satisfy WCAG AA >=4.5:1 on dark surfaces */
+    --c-ink-faint: 140 140 150;
     --c-line: 255 255 255;
     --c-accent: 244 244 245;
     --c-accent-ink: 17 17 20;

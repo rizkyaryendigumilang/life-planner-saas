@@ -59,6 +59,14 @@ const pageMeta: Record<Page, string> = {
   settings: "Settings",
 };
 
+const mobileBottomTabs: Array<{ id: Page | "more"; label: string; icon: typeof Activity }> = [
+  { id: "overview", label: "Overview", icon: Activity },
+  { id: "finance", label: "Finance", icon: CircleDollarSign },
+  { id: "planner", label: "Planner", icon: CheckSquare },
+  { id: "bank-accounts", label: "Accounts", icon: CreditCard },
+  { id: "more", label: "More", icon: Menu },
+];
+
 function ThemeToggle() {
   const { preference, setPreference } = useTheme();
   const options: Array<{ value: ThemePreference; label: string; icon: typeof Sun }> = [
@@ -84,7 +92,7 @@ function ThemeToggle() {
               active ? "bg-line/[.07] text-ink" : "text-ink-faint hover:text-ink",
             )}
           >
-            <Icon size={13} strokeWidth={1.9} />
+            <Icon size={13} strokeWidth={1.9} aria-hidden="true" />
             <span>{option.label}</span>
           </button>
         );
@@ -207,7 +215,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
                         selected ? "bg-line/[.06] font-medium text-ink" : "text-ink-soft hover:bg-line/[.04] hover:text-ink",
                       )}
                     >
-                      <Icon size={16} strokeWidth={1.9} className={selected ? "text-ink" : "text-ink-faint"} />
+                      <Icon size={16} strokeWidth={1.9} className={selected ? "text-ink" : "text-ink-faint"} aria-hidden="true" />
                       <span className="flex-1 truncate">{item.label}</span>
                     </button>
                   );
@@ -226,7 +234,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
                   page === "admin" ? "bg-line/[.06] font-medium text-ink" : "text-ink-soft hover:bg-line/[.04] hover:text-ink",
                 )}
               >
-                <Shield size={16} strokeWidth={1.9} className={page === "admin" ? "text-ink" : "text-ink-faint"} />
+                <Shield size={16} strokeWidth={1.9} className={page === "admin" ? "text-ink" : "text-ink-faint"} aria-hidden="true" />
                 <span className="flex-1">Admin control</span>
               </button>
             </div>
@@ -239,7 +247,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
               onClick={() => void promptInstall()}
               className="flex min-h-9 w-full items-center gap-2.5 rounded-lg bg-line/[.05] px-2.5 text-left text-[13px] text-ink transition hover:bg-line/[.09]"
             >
-              <Download size={16} strokeWidth={1.9} />
+              <Download size={16} strokeWidth={1.9} aria-hidden="true" />
               <span className="font-medium">Install App</span>
             </button>
           )}
@@ -250,7 +258,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
               page === "settings" ? "bg-line/[.06] font-medium text-ink" : "text-ink-soft hover:bg-line/[.04] hover:text-ink",
             )}
           >
-            <Settings2 size={16} strokeWidth={1.9} className={page === "settings" ? "text-ink" : "text-ink-faint"} />
+            <Settings2 size={16} strokeWidth={1.9} className={page === "settings" ? "text-ink" : "text-ink-faint"} aria-hidden="true" />
             <span>Settings</span>
           </button>
           <div className="px-2.5 pt-2">
@@ -261,7 +269,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             onClick={onLogout}
             className="flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-ink-soft transition hover:bg-negative/10 hover:text-negative"
           >
-            <LogOut size={16} strokeWidth={1.9} className="text-ink-faint" />
+            <LogOut size={16} strokeWidth={1.9} className="text-ink-faint" aria-hidden="true" />
             <span>Sign out</span>
           </button>
         </div>
@@ -305,8 +313,8 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             </button>
           </div>
         </header>
-        <div className="mx-auto max-w-[1500px] p-4 sm:p-6 lg:p-8">{children}</div>
-        <footer className="flex flex-col sm:flex-row items-center justify-center gap-2 px-6 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4 text-center text-xs text-ink-faint">
+        <div className="mx-auto max-w-[1500px] p-4 pb-20 sm:p-6 sm:pb-24 lg:p-8 lg:pb-8">{children}</div>
+        <footer className="flex flex-col sm:flex-row items-center justify-center gap-2 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4 text-center text-xs text-ink-faint">
           <div className="flex items-center gap-1.5 font-medium text-ink-soft">
             <BrandLogo variant="mark" size="xs" />
             <span>LifePlanner</span>
@@ -315,6 +323,49 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
           <span>A little more clarity, every day</span>
         </footer>
       </main>
+
+      {/* Mobile Bottom Navigation Bar (Thumb-friendly for smartphone viewports) */}
+      <nav
+        aria-label="Mobile bottom navigation"
+        className="fixed bottom-0 inset-x-0 z-30 flex items-center justify-around border-t border-line/10 bg-canvas/92 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-1 backdrop-blur-xl lg:hidden shadow-soft"
+      >
+        {mobileBottomTabs.map((tab) => {
+          const Icon = tab.icon;
+          const isMore = tab.id === "more";
+          const isSelected = isMore
+            ? open || !["overview", "finance", "planner", "bank-accounts"].includes(page)
+            : page === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              aria-current={isSelected && !isMore ? "page" : undefined}
+              aria-label={tab.label}
+              onClick={() => {
+                if (isMore) {
+                  setOpen((prev) => !prev);
+                } else {
+                  navigate(tab.id as Page);
+                }
+              }}
+              className={cn(
+                "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-center transition-all duration-150 active:scale-95 touch-manipulation min-h-[48px]",
+                isSelected ? "text-ink font-semibold" : "text-ink-faint hover:text-ink-soft",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                  isSelected ? "bg-line/[.08]" : "bg-transparent",
+                )}
+              >
+                <Icon size={18} strokeWidth={isSelected ? 2.2 : 1.8} aria-hidden="true" />
+              </div>
+              <span className="text-[10px] tracking-tight leading-none">{tab.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }

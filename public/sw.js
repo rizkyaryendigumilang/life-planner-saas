@@ -1,4 +1,4 @@
-const CACHE_NAME = "life-planner-v2";
+const CACHE_NAME = "life-planner-v3";
 
 function resolveScopeAssets() {
   const scope = self.registration ? self.registration.scope : self.location.href;
@@ -52,6 +52,8 @@ self.addEventListener("fetch", (event) => {
   // Never intercept API requests, PocketBase backend, or non-GET methods
   if (
     url.pathname.startsWith("/api") ||
+    url.pathname.includes("/life-planner-api") ||
+    url.pathname.includes("/life-planner-pb") ||
     url.port === "8090" ||
     url.port === "3001" ||
     event.request.method !== "GET"

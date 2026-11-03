@@ -19,10 +19,10 @@ export function Button({ className, variant = "primary", size = "md", type = "bu
     danger: "border border-negative/25 bg-negative/10 text-negative hover:bg-negative/[.16]",
   } as const;
   const sizes = {
-    sm: "min-h-8 gap-1.5 rounded-lg px-3 text-xs",
+    sm: "relative min-h-8 gap-1.5 rounded-lg px-3 text-xs before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']",
     md: "min-h-10 gap-2 rounded-lg px-4 text-sm",
     lg: "min-h-11 gap-2 rounded-lg px-5 text-sm",
-    icon: "h-9 w-9 rounded-lg p-0",
+    icon: "relative h-9 w-9 rounded-lg p-0 before:absolute before:-inset-1 before:content-['']",
   } as const;
   return (
     <button
@@ -46,7 +46,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cx(
-        "min-h-10 w-full rounded-lg border border-line/15 bg-surface px-3 text-base sm:text-sm text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/40 focus:ring-4 focus:ring-ink/[.06] disabled:cursor-not-allowed disabled:bg-muted disabled:text-ink-faint",
+        "min-h-10 w-full rounded-lg border border-line/15 bg-surface px-3 text-base sm:text-sm text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/40 focus:ring-4 focus:ring-ink/[.06] disabled:cursor-not-allowed disabled:bg-muted disabled:text-ink-faint aria-[invalid=true]:border-negative/50 aria-[invalid=true]:focus:ring-negative/[.08]",
         className,
       )}
       {...props}
@@ -58,7 +58,7 @@ export function Textarea({ className, ...props }: React.TextareaHTMLAttributes<H
   return (
     <textarea
       className={cx(
-        "min-h-24 w-full resize-y rounded-lg border border-line/15 bg-surface px-3 py-2.5 text-base sm:text-sm text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/40 focus:ring-4 focus:ring-ink/[.06]",
+        "min-h-24 w-full resize-y rounded-lg border border-line/15 bg-surface px-3 py-2.5 text-base sm:text-sm text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/40 focus:ring-4 focus:ring-ink/[.06] aria-[invalid=true]:border-negative/50 aria-[invalid=true]:focus:ring-negative/[.08]",
         className,
       )}
       {...props}
@@ -472,6 +472,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={description ? `${titleId}-desc` : undefined}
         className={cx(
           "dialog-scroll w-full max-w-xl rounded-t-2xl border border-line/15 bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-pop sm:rounded-xl sm:p-6",
           className,
@@ -482,15 +483,15 @@ export function Dialog({
             <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm text-ink-soft">{description}</p>}
+            {description && <p id={`${titleId}-desc`} className="mt-1 text-sm text-ink-soft">{description}</p>}
           </div>
           <button
             type="button"
             aria-label="Close dialog"
             onClick={() => onOpenChange(false)}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-line/[.06] hover:text-ink"
+            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-line/[.06] hover:text-ink before:absolute before:-inset-1.5 before:content-['']"
           >
-            <X size={17} />
+            <X size={17} aria-hidden="true" />
           </button>
         </div>
         {children}

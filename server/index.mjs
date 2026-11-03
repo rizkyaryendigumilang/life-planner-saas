@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { Readable } from "node:stream";
 
 const app = express();
+app.set("trust proxy", 1);
 
 const PORT = Number(process.env.API_PORT || 3001);
 const API_HOST = process.env.API_HOST || "0.0.0.0";
@@ -27,21 +28,23 @@ const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGINS || "http://localhost:5173
 
 function isOriginAllowed(origin) {
   if (!origin) return true;
+  if (origin === "null") return false;
   if (FRONTEND_ORIGINS.includes(origin)) return true;
 
   try {
     const url = new URL(origin);
+    if (url.protocol === "null:") return false;
     const host = url.hostname;
 
     // Allow local development & loopback
     if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1") {
       return true;
     }
-    // Allow private LAN IPs (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+    // Allow strictly formatted private LAN IPv4 addresses (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
     if (
-      /^192\.168\./.test(host) ||
-      /^10\./.test(host) ||
-      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(host)
     ) {
       return true;
     }
@@ -72,7 +75,35 @@ const pb = new PocketBase(PB_URL);
 
 pb.autoCancellation(false);
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        scriptSrcElem: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+        fontSrc: ["'self'", "data:", "https:"],
+        connectSrc: [
+          "'self'",
+          "blob:",
+          "https://cdn.jsdelivr.net",
+          "https://tessdata.projectnaptha.com",
+          "https://raw.githubusercontent.com",
+          "http://127.0.0.1:*",
+          "http://localhost:*",
+          "https:",
+        ],
+        workerSrc: ["'self'", "blob:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        frameAncestors: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 app.use(compression({ threshold: 1024 }));
 
 app.use(
@@ -96,10 +127,36 @@ app.use(
 // Lightweight in-memory limiter. For multi-instance production deployments,
 // replace this with a shared store (for example Redis).
 const rateBuckets = new Map();
+const KNOWN_API_GROUPS = new Set([
+  "admin",
+  "auth",
+  "shortcuts",
+  "calendar",
+  "expense-ingestions",
+  "shortcut-tokens",
+  "network-info",
+  "public-base",
+  "health",
+]);
+
+function getNormalizedRateLimitScope(req) {
+  if (req.baseUrl) return req.baseUrl;
+  const parts = (req.path || "").split("/").filter(Boolean);
+  if (parts.length > 0 && parts[0] === "api") {
+    const group = parts[1] || "";
+    if (KNOWN_API_GROUPS.has(group)) {
+      return `/api/${group}`;
+    }
+    return "/api/other";
+  }
+  return parts.length > 0 ? `/${parts[0]}` : "/";
+}
+
 function rateLimit({ windowMs = 15 * 60 * 1000, max = 120 } = {}) {
   return (req, res, next) => {
     const now = Date.now();
-    const key = `${req.ip || req.socket.remoteAddress || "unknown"}:${req.baseUrl || ""}${req.path}`;
+    const normalizedScope = getNormalizedRateLimitScope(req);
+    const key = `${req.ip || req.socket.remoteAddress || "unknown"}:${normalizedScope}`;
     let bucket = rateBuckets.get(key);
     if (!bucket || now >= bucket.resetAt) {
       bucket = { count: 0, resetAt: now + windowMs };
@@ -2141,7 +2198,8 @@ app.get("/api/admin/backups/:key/download", async (req, res) => {
       throw new Error(`PocketBase download failed with status ${pbRes.status}`);
     }
 
-    res.setHeader("Content-Disposition", `attachment; filename="${key}"`);
+    const safeFilename = path.basename(String(key)).replace(/[^a-zA-Z0-9._-]/g, "_") || "backup.zip";
+    res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
     res.setHeader("Content-Type", pbRes.headers.get("content-type") || "application/zip");
 
     if (pbRes.body) {
