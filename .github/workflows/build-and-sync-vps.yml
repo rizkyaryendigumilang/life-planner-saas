@@ -92,40 +92,52 @@ jobs:
 
       - name: Transfer APK to VPS via Verified SSH & SCP
         if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
+        continue-on-error: true
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
           VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 2222 }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
           VPS_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
           VPS_TARGET: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
         run: |
           set -euo pipefail
+
+          TARGET_PORT="$VPS_PORT"
+          if ! nc -z -w 3 "$VPS_HOST" "$TARGET_PORT" 2>/dev/null; then
+            if nc -z -w 3 "$VPS_HOST" 22 2>/dev/null; then
+              TARGET_PORT=22
+            elif nc -z -w 3 "$VPS_HOST" 2222 2>/dev/null; then
+              TARGET_PORT=2222
+            fi
+          fi
+          echo "Target VPS SSH port: $TARGET_PORT"
+
           mkdir -p "$HOME/.ssh"
           printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
             printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+            ssh-keyscan -p "$TARGET_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
             chmod 600 "$HOME/.ssh/known_hosts"
             STRICT_OPT="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           else
-            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null || true
+            ssh-keyscan -p "$TARGET_PORT" -H "$VPS_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null || true
             chmod 600 "$HOME/.ssh/known_hosts"
             STRICT_OPT="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           fi
 
           # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
 
           # 2. Upload APK via SCP
           echo "Mentransfer app-latest.apk ke VPS..."
-          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"
+          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"
 
           # 3. Pastikan izin akses file agar dapat diunduh melalui web server (Caddy/Nginx)
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "chmod 644 '$VPS_TARGET/app-latest.apk'"
 
           rm -f "$HOME/.ssh/id_ed25519"
@@ -215,39 +227,51 @@ jobs:
 
       - name: Transfer IPA to VPS via SCP
         if: ${{ env.VPS_HOST != '' && env.VPS_SSH_KEY != '' }}
+        continue-on-error: true
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME || 'ubuntu' }}
           VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 2222 }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || 22 }}
           VPS_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
           VPS_TARGET: ${{ vars.VPS_TARGET_DIR || secrets.VPS_TARGET_DIR || '/srv/www/life-planner/downloads' }}
         run: |
           set -euo pipefail
+
+          TARGET_PORT="$VPS_PORT"
+          if ! nc -z -w 3 "$VPS_HOST" "$TARGET_PORT" 2>/dev/null; then
+            if nc -z -w 3 "$VPS_HOST" 22 2>/dev/null; then
+              TARGET_PORT=22
+            elif nc -z -w 3 "$VPS_HOST" 2222 2>/dev/null; then
+              TARGET_PORT=2222
+            fi
+          fi
+          echo "Target VPS SSH port: $TARGET_PORT"
+
           mkdir -p "$HOME/.ssh"
           printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
             printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+            ssh-keyscan -p "$TARGET_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
             chmod 600 "$HOME/.ssh/known_hosts"
             STRICT_OPT="-o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           else
-            ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null || true
+            ssh-keyscan -p "$TARGET_PORT" -H "$VPS_HOST" > "$HOME/.ssh/known_hosts" 2>/dev/null || true
             chmod 600 "$HOME/.ssh/known_hosts"
             STRICT_OPT="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           fi
           # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
 
           # 2. Upload IPA via SCP
           echo "Mentransfer app-latest.ipa ke VPS..."
-          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"
+          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"
 
           # 3. Pastikan izin akses file agar dapat diunduh melalui web server
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "chmod 644 '$VPS_TARGET/app-latest.ipa'"
 
           rm -f "$HOME/.ssh/id_ed25519"
