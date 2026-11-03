@@ -459,7 +459,7 @@ function TaskCard({
 
         <button
           onClick={() => onDelete(task)}
-          className="text-ink-faint opacity-0 transition group-hover:opacity-100 hover:text-negative"
+          className="grid h-8 w-8 min-h-[32px] min-w-[32px] place-items-center rounded-lg text-ink-faint transition opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:text-negative hover:bg-line/[.06] active:scale-95 touch-manipulation"
           aria-label="Delete"
         >
           <Trash2 size={15} />

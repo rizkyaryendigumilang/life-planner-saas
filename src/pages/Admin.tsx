@@ -1266,8 +1266,11 @@ export function Admin() {
           </div>
 
           {/* Audit Logs Table */}
+          <div className="flex items-center justify-between px-1 pb-1.5 text-[11px] text-ink-faint sm:hidden">
+            <span>Geser tabel ke samping untuk rincian &rarr;</span>
+          </div>
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overscroll-x-contain">
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="bg-muted text-xs text-ink-soft">
                   <tr>
@@ -1422,8 +1425,11 @@ export function Admin() {
             </div>
           </Card>
 
+          <div className="flex items-center justify-between px-1 pb-1.5 text-[11px] text-ink-faint sm:hidden">
+            <span>Geser tabel ke samping untuk rincian &rarr;</span>
+          </div>
           <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overscroll-x-contain">
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead className="bg-muted text-xs text-ink-soft">
                   <tr>

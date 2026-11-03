@@ -137,6 +137,17 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     return () => window.removeEventListener("keydown", onShortcut);
   }, []);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (open) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   function handleSearchKeyDown(event: import("react").KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && visibleQuickPages[0]) {
       event.preventDefault();
@@ -152,7 +163,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     <div className="min-h-screen bg-canvas text-ink">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[262px] flex-col border-r border-line/10 bg-surface px-3 py-5 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] transition-transform duration-200 lg:translate-x-0 lg:pt-5 lg:pb-5 lg:pl-3",
+          "fixed inset-y-0 left-0 z-40 flex w-[262px] flex-col border-r border-line/10 bg-surface px-3 py-5 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] transition-transform duration-200 lg:translate-x-0 lg:pt-5 lg:pb-5 lg:pl-3 overscroll-contain",
           open ? "translate-x-0 shadow-pop" : "-translate-x-full",
         )}
       >
@@ -174,7 +185,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             onKeyDown={handleSearchKeyDown}
             aria-label="Search pages and navigate"
             placeholder="Search pages"
-            className="h-9 w-full rounded-lg border border-line/15 bg-transparent pl-9 pr-12 text-xs text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/35 focus:ring-4 focus:ring-ink/[.05]"
+            className="h-9 w-full rounded-lg border border-line/15 bg-transparent pl-9 pr-12 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/35 focus:ring-4 focus:ring-ink/[.05]"
           />
           <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-line/15 px-1.5 py-0.5 text-[9px] font-medium text-ink-faint sm:block">Ctrl K</kbd>
           {searchTerm.trim() && (
@@ -197,7 +208,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
           )}
         </div>
 
-        <nav aria-label="Primary navigation" className="flex-1 space-y-6 overflow-y-auto px-1 pb-4">
+        <nav aria-label="Primary navigation" className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-1 pb-4">
           {navGroups.map((group) => (
             <div key={group.title}>
               <p className="mb-1.5 px-2.5 text-[10px] font-medium uppercase tracking-[.14em] text-ink-faint">{group.title}</p>

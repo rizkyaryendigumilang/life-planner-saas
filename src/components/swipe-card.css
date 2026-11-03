@@ -292,9 +292,11 @@
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #ffffff;
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -302,6 +304,7 @@
   transition: background 0.15s ease, transform 0.1s ease;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  touch-action: manipulation;
 }
 
 .card-mini-btn:hover {

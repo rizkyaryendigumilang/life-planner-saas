@@ -412,7 +412,7 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   );
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4 py-10 text-ink sm:px-5 sm:py-14">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-canvas px-4 py-10 text-ink sm:px-5 sm:py-14">
       <div className="w-full max-w-[380px] animate-rise">
         <div className="mb-6 flex flex-col items-center text-center">
           <BrandLogo variant="full" size="md" />
@@ -434,7 +434,6 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com or username"
                     autoComplete="username"
-                    autoFocus
                     required
                   />
                 </div>
@@ -502,7 +501,6 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     autoComplete="email"
-                    autoFocus
                     required
                   />
                 </div>

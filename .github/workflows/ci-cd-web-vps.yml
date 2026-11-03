@@ -511,6 +511,15 @@ jobs:
             (cd "$dir" && npm ci --omit=dev --no-audit --no-fund)
           fi
 
+          # 4b. Ensure Caddy is configured for sslip.io wildcard domain
+          if sudo -n test -f /etc/caddy/Caddyfile; then
+            if ! sudo -n grep -q "43.156.236.102.sslip.io" /etc/caddy/Caddyfile; then
+              sudo -n sed -i 's/43.156.236.102/43.156.236.102, 43.156.236.102.sslip.io/' /etc/caddy/Caddyfile
+              sudo -n systemctl reload caddy || true
+              echo "✓ Added 43.156.236.102.sslip.io to Caddyfile and reloaded Caddy."
+            fi
+          fi
+
           # 5. Restart PocketBase first so pending migrations are applied,
           #    then the API that depends on it.
           sudo -n systemctl restart life-planner-pocketbase.service

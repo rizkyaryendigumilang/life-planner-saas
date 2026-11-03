@@ -167,8 +167,10 @@
   backdrop-filter: blur(6px);
 }
 .dialog-scroll {
-  max-height: min(88vh, 900px);
+  max-height: min(88dvh, 88vh, 900px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 ::-webkit-scrollbar {
