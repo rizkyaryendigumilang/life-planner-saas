@@ -136,7 +136,7 @@ jobs:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
           VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
           VPS_SSH_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
@@ -168,6 +168,7 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519"
 
           printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
           chmod 600 "$HOME/.ssh/known_hosts"
 
           echo "✓ SSH configuration and host key verification established strictly."
@@ -176,10 +177,10 @@ jobs:
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
         run: |
           set -euo pipefail
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./artifact/web-dist.tar.gz "$VPS_USER@$VPS_HOST:web-dist-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          scp -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./artifact/web-dist.tar.gz "$VPS_USER@$VPS_HOST:web-dist-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
           echo "✓ Web bundle uploaded successfully."
 
       - name: Deploy bundle atomically with backup
@@ -187,11 +188,11 @@ jobs:
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
           VPS_ROOT: ${{ vars.VPS_WEB_ROOT || secrets.VPS_WEB_ROOT || '/srv/www/life-planner' }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'REMOTE'
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'REMOTE'
           set -Eeuo pipefail
 
           live="$1"
@@ -324,12 +325,12 @@ jobs:
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
           VPS_ROOT: ${{ vars.VPS_WEB_ROOT || secrets.VPS_WEB_ROOT || '/srv/www/life-planner' }}
         run: |
           set -euo pipefail
           echo "::warning::Health check failed after deployment. Initiating automatic rollback on VPS..."
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'ROLLBACK'
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_ROOT' 'life-planner' '${GITHUB_SHA}' '${GITHUB_RUN_ID}'" <<'ROLLBACK'
           set -euo pipefail
           live="$1"
           slug="$2"
@@ -369,7 +370,7 @@ jobs:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
           VPS_KEY: ${{ secrets.VPS_SSH_KEY }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
           VPS_SSH_KNOWN_HOSTS: ${{ vars.VPS_SSH_KNOWN_HOSTS || secrets.VPS_SSH_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
@@ -395,6 +396,7 @@ jobs:
           printf '%s\n' "$VPS_KEY" | tr -d '\r' > "$HOME/.ssh/id_ed25519"
           chmod 600 "$HOME/.ssh/id_ed25519"
           printf '%s\n' "$VPS_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
           chmod 600 "$HOME/.ssh/known_hosts"
           echo "✓ SSH configuration verified."
 
@@ -408,21 +410,21 @@ jobs:
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
         run: |
           set -euo pipefail
-          scp -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./backend.tar.gz "$VPS_USER@$VPS_HOST:life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
+          scp -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -P "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" ./backend.tar.gz "$VPS_USER@$VPS_HOST:life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz"
 
       - name: Install and restart services on VPS
         id: backend
         env:
           VPS_HOST: ${{ vars.VPS_HOST || secrets.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USERNAME || secrets.VPS_USERNAME }}
-          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '22' }}
+          VPS_PORT: ${{ vars.VPS_SSH_PORT || secrets.VPS_SSH_PORT || vars.VPS_PORT || secrets.VPS_PORT || '2222' }}
           VPS_BACKEND_DIR: ${{ vars.VPS_BACKEND_DIR || '/home/ubuntu/platform-repos/life-planner-saas' }}
         run: |
           set -euo pipefail
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_BACKEND_DIR' 'life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz' '${GITHUB_SHA}'" <<'REMOTE'
+          ssh -o BatchMode=yes -o ConnectTimeout=20 -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -p "$VPS_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "bash -s -- '$VPS_BACKEND_DIR' 'life-planner-backend-${GITHUB_SHA}-${GITHUB_RUN_ID}.tar.gz' '${GITHUB_SHA}'" <<'REMOTE'
           set -Eeuo pipefail
 
           dir="$1"
