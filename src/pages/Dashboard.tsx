@@ -573,23 +573,25 @@ export function Dashboard({
     );
 
   const portfolioValue =
-    portfolio.reduce(
-      (sum, item) => {
-        const quote = quotes.get(
-          `${item.asset_type}:${item.symbol.toUpperCase()}`,
-        );
+    Math.round(
+      portfolio.reduce(
+        (sum, item) => {
+          const quote = quotes.get(
+            `${item.asset_type}:${item.symbol.toUpperCase()}`,
+          );
 
-        return (
-          sum +
-          (quote?.price != null
-            ? Number(
-                item.quantity || 0,
-              ) * quote.price
-            : 0)
-        );
-      },
-      0,
-    );
+          return (
+            sum +
+            (quote?.price != null
+              ? Number(
+                  item.quantity || 0,
+                ) * quote.price
+              : 0)
+          );
+        },
+        0,
+      ) * 100,
+    ) / 100;
 
   const hasPortfolioMarketValue =
     portfolio.some((item) => {
@@ -600,28 +602,29 @@ export function Dashboard({
       );
     });
 
+  const currentHour = new Date().getHours();
+  const timeGreeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
+  const userRecord = pb.authStore.record as { name?: string; username?: string } | null;
+  const firstName = userRecord?.name ? userRecord.name.trim().split(/\s+/)[0] : userRecord?.username || "";
+
   const pageTitle =
     section === "goals"
       ? "Goals"
       : section === "calendar"
         ? "Calendar"
-        : "Good evening.";
+        : firstName
+          ? `${timeGreeting}, ${firstName}.`
+          : `${timeGreeting}.`;
 
   const pageSubtitle = section
     ? `Your ${section} workspace at a glance.`
-    : "Here is what is happening across your life planner.";
+    : "Overview of your finances, upcoming tasks, and active goals.";
 
   return (
     <>
     <div className="animate-rise">
       <div className="mb-7 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-line/15 bg-surface px-2.5 py-1 text-xs text-ink-soft shadow-xs">
-            <BrandLogo variant="mark" size="xs" />
-            <span className="font-semibold text-ink">LifePlanner</span>
-            <span className="text-line/20">•</span>
-            <span>Personal Workspace</span>
-          </div>
           <h1 className="text-3xl font-semibold tracking-[-.03em]">
             {pageTitle}
           </h1>

@@ -6,3 +6,11 @@ dist
 .DS_Store
 *.log
 pocketbase/pb_data/
+
+# Showcase & Remotion Scratch Assets
+concat-projects/
+public/showcase/
+remotion/
+scripts/capture-live-demo.mjs
+scripts/render-showcase.mjs
+scripts/setup-concat-project.mjs

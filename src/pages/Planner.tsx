@@ -217,7 +217,7 @@ export function Planner() {
           </h1>
 
           <p className="mt-1 text-sm text-ink-soft">
-            TickTick-style personal tasks with a Trello-style visual board.
+            Organize daily priorities, manage multi-stage projects, and track commitments.
           </p>
         </div>
 

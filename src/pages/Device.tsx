@@ -9,7 +9,7 @@ export function Device() {
           Device & Integration
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
-          Pasang LifePlanner di ponsel, tablet, atau komputer Anda dengan skema PWA, serta hubungkan integrasi iOS Shortcut untuk pencatatan otomatis.
+          Install LifePlanner as a PWA on your phone, tablet, or desktop, and connect Apple Shortcuts for fast automated capture.
         </p>
       </div>
 

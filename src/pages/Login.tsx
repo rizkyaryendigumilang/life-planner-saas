@@ -416,7 +416,7 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
       <div className="w-full max-w-[380px] animate-rise">
         <div className="mb-6 flex flex-col items-center text-center">
           <BrandLogo variant="full" size="md" />
-          <p className="mt-3 text-xs text-ink-faint">Smart Personal Life & Finance Workspace</p>
+          <p className="mt-3 text-xs text-ink-faint">Personal life and finance workspace</p>
         </div>
 
         {mode === "login" && (

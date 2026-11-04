@@ -203,9 +203,21 @@ function getBearerToken(req) {
   return authorization.slice(7).trim();
 }
 
+const authCache = new Map();
+
 async function authenticateRequest(req, { admin = false } = {}) {
   const token = getBearerToken(req);
   if (!token) return false;
+
+  const now = Date.now();
+  const cached = authCache.get(token);
+  if (cached && cached.expiresAt > now) {
+    const user = cached.user;
+    if (!user || user.status !== "active") return false;
+    if (admin && user.role !== "superadmin") return false;
+    req.authUser = user;
+    return true;
+  }
 
   try {
     const userClient = new PocketBase(PB_URL);
@@ -215,9 +227,18 @@ async function authenticateRequest(req, { admin = false } = {}) {
     const user = refreshed?.record;
     if (!user || user.status !== "active") return false;
     if (admin && user.role !== "superadmin") return false;
+
+    authCache.set(token, { user, expiresAt: now + 20_000 });
+    if (authCache.size > 500) {
+      for (const [t, entry] of authCache.entries()) {
+        if (entry.expiresAt <= now) authCache.delete(t);
+      }
+    }
+
     req.authUser = user;
     return true;
   } catch {
+    authCache.delete(token);
     return false;
   }
 }
@@ -915,7 +936,7 @@ async function collectCalendarEvents(userId) {
   const [tasks, trips, goals, experiences] = await Promise.all([
     pb.collection("life_planner").getFullList({ filter, sort: "due_date" }),
     pb.collection("travel_trips").getFullList({ filter, sort: "start_date" }),
-    pb.collection("goals").getFullList({ filter, sort: "due_date" }),
+    pb.collection("goals").getFullList({ filter, sort: "target_date" }),
     pb.collection("experiences").getFullList({ filter, sort: "start_date" }),
   ]);
 
@@ -2535,6 +2556,14 @@ async function telegramUpdateLoop() {
 
   try {
     while (telegramLogins.size > 0) {
+      const now = Date.now();
+      for (const [code, entry] of telegramLogins) {
+        if (entry.expiresAt <= now) {
+          telegramLogins.delete(code);
+        }
+      }
+      if (telegramLogins.size === 0) break;
+
       const body = await telegramApi(
         "getUpdates",
         {

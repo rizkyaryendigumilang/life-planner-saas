@@ -340,34 +340,20 @@ export function Finance() {
     }
 
     return items.filter((item) => {
-      const account =
-        item.account
-          ? accountMap.get(
-              item.account,
-            )
-          : undefined;
+      if (item.category?.toLowerCase().includes(keyword)) return true;
+      if (item.notes?.toLowerCase().includes(keyword)) return true;
+      if (item.type?.toLowerCase().includes(keyword)) return true;
 
-      const accountText =
-        account
-          ? `
-              ${account.bank_name}
-              ${account.account_name}
-              ${account.account_number || ""}
-            `
-          : "";
+      if (item.account) {
+        const account = accountMap.get(item.account);
+        if (account) {
+          if (account.bank_name?.toLowerCase().includes(keyword)) return true;
+          if (account.account_name?.toLowerCase().includes(keyword)) return true;
+          if (account.account_number?.toLowerCase().includes(keyword)) return true;
+        }
+      }
 
-      const searchableText = `
-        ${item.category}
-        ${item.notes || ""}
-        ${item.type}
-        ${accountText}
-      `
-        .toLowerCase()
-        .trim();
-
-      return searchableText.includes(
-        keyword,
-      );
+      return false;
     });
   }, [
     items,
@@ -914,13 +900,11 @@ export function Finance() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold tracking-[-.03em]">
-            Expense Tracking
+            Finance
           </h1>
 
           <p className="mt-1 text-sm text-ink-soft">
-            Know where the money moved,
-            without making finance feel
-            like work.
+            Track income and expenses, monitor category budgets, and review monthly cash flow.
           </p>
         </div>
 
@@ -942,7 +926,7 @@ export function Finance() {
           ===================================================== */}
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-line/15 bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-soft sm:pl-1">
+          <span className="text-xs font-medium text-ink-soft sm:pl-1">
             Period
           </span>
           <div className="w-full sm:w-56">

@@ -276,13 +276,6 @@ export function BankAccounts() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-ink-faint">
-            <WalletCards className="h-4 w-4" />
-            <span className="text-xs font-medium uppercase tracking-[0.18em]">
-              Wallet & Accounts
-            </span>
-          </div>
-
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
             Accounts
           </h1>

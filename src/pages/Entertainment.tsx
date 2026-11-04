@@ -629,17 +629,12 @@ export function Entertainment() {
       <section>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-faint">
+            <h1 className="text-2xl font-semibold tracking-tight text-ink">
               Experiences
-            </p>
-
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-ink">
-              Entertainment
             </h1>
 
             <p className="mt-1 max-w-xl text-sm text-ink-soft">
-              Plan the experiences you want to enjoy
-              and remember.
+              Plan and record concerts, movies, dining, and memorable events.
             </p>
           </div>
 

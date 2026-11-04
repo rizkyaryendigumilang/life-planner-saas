@@ -666,7 +666,7 @@ function SummaryCard({
       <div className="flex items-center gap-2 text-ink-soft">
         {icon}
 
-        <p className="text-xs font-medium uppercase tracking-[0.12em]">
+        <p className="text-xs font-medium text-ink-soft">
           {label}
         </p>
       </div>

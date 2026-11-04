@@ -39,7 +39,7 @@ export function Button({ className, variant = "primary", size = "md", type = "bu
 }
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("rounded-xl border border-line/15 bg-surface", className)} {...props} />;
+  return <div className={cx("rounded-xl border border-line/12 bg-surface shadow-xs transition-colors", className)} {...props} />;
 }
 
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -418,14 +418,14 @@ export function Badge({
   className?: string;
 }) {
   const styles = {
-    neutral: "border-line/10 bg-muted text-ink-soft",
-    accent: "border-line/15 bg-line/[.05] text-ink",
-    success: "border-positive/25 bg-positive/10 text-positive",
-    warning: "border-caution/25 bg-caution/10 text-caution",
-    danger: "border-negative/25 bg-negative/10 text-negative",
+    neutral: "border-line/12 bg-muted/60 text-ink-soft",
+    accent: "border-line/15 bg-line/[.06] text-ink",
+    success: "border-positive/20 bg-positive/10 text-positive",
+    warning: "border-caution/20 bg-caution/10 text-caution",
+    danger: "border-negative/20 bg-negative/10 text-negative",
   } as const;
   return (
-    <span className={cx("inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-[11px] font-medium leading-none", styles[tone], className)}>
+    <span className={cx("inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium leading-normal tracking-tight select-none", styles[tone], className)}>
       {children}
     </span>
   );

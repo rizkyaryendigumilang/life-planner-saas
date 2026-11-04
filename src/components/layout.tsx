@@ -211,7 +211,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
         <nav aria-label="Primary navigation" className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-1 pb-4">
           {navGroups.map((group) => (
             <div key={group.title}>
-              <p className="mb-1.5 px-2.5 text-[10px] font-medium uppercase tracking-[.14em] text-ink-faint">{group.title}</p>
+              <p className="mb-1.5 px-2.5 text-[11px] font-medium text-ink-faint tracking-wide">{group.title}</p>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
@@ -236,7 +236,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
           ))}
           {role === "superadmin" && (
             <div>
-              <p className="mb-1.5 px-2.5 text-[10px] font-medium uppercase tracking-[.14em] text-ink-faint">Management</p>
+              <p className="mb-1.5 px-2.5 text-[11px] font-medium text-ink-faint tracking-wide">Management</p>
               <button
                 onClick={() => navigate("admin")}
                 aria-current={page === "admin" ? "page" : undefined}
@@ -273,7 +273,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             <span>Settings</span>
           </button>
           <div className="px-2.5 pt-2">
-            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[.14em] text-ink-faint">Theme</p>
+            <p className="mb-1.5 text-[11px] font-medium text-ink-faint tracking-wide">Theme</p>
             <ThemeToggle />
           </div>
           <button
@@ -331,7 +331,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             <span>LifePlanner</span>
           </div>
           <span className="hidden sm:inline text-line/20">•</span>
-          <span>A little more clarity, every day</span>
+          <span>Personal life and finance workspace</span>
         </footer>
       </main>
 

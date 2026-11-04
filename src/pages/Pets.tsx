@@ -24,7 +24,7 @@ export function Pets() {
   async function remove(p: Pet) { try { await pb.collection("pets").delete(p.id); setPets(x => x.filter(i => i.id !== p.id)); toast.success(`${p.name} removed`); } catch { toast.error("Could not remove pet"); } }
   return <div className="animate-rise">
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div><h1 className="text-3xl font-semibold tracking-[-.03em]">Pet Management</h1><p className="mt-1 text-sm text-ink-soft">Keep every pet as a profile, not just an expense category.</p></div>
+      <div><h1 className="text-3xl font-semibold tracking-[-.03em]">Pets</h1><p className="mt-1 text-sm text-ink-soft">Profiles, health reminders, and expense history for your pets.</p></div>
       <Button onClick={() => setOpen(true)}><Plus size={16}/> Add pet</Button>
     </div>
     <div className="mb-5 flex items-center justify-between gap-3"><div className="relative w-full max-w-sm"><Search size={16} className="absolute left-3 top-3 text-ink-soft"/><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search pets…" className="pl-9"/></div><span className="text-xs text-ink-soft">{filtered.length} pets</span></div>
