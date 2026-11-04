@@ -1295,6 +1295,7 @@ function GoalDialog({
             >
               <input
                 type="number"
+                inputMode="numeric"
                 min="1"
                 className="form-input"
                 value={targetAmount}
@@ -1311,6 +1312,7 @@ function GoalDialog({
             <Field label="Current amount">
               <input
                 type="number"
+                inputMode="numeric"
                 min="0"
                 className="form-input"
                 value={currentAmount}
@@ -1506,6 +1508,7 @@ function ContributionDialog({
           >
             <input
               type="number"
+              inputMode="numeric"
               min="1"
               className="form-input"
               value={amount}

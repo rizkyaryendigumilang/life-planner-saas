@@ -938,111 +938,70 @@ export function Finance() {
       </div>
 
       {/* =====================================================
-          EXPENSE PERIOD
+          PERIOD FILTER & QUICK ACTIONS TOOLBAR
           ===================================================== */}
-      <div className="mb-4 flex flex-col gap-4 rounded-2xl border border-line/15 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">
-            Expense period
-          </p>
-
-          <p className="mt-1 text-xs text-ink-soft">
-            Transactions are organized by
-            transaction date.
-          </p>
-        </div>
-
-        <div className="w-full sm:w-56">
-          <Select
-            value={selectedMonth}
-            onValueChange={handleMonthChange}
-          >
-            <SelectItem value="all">
-              All months
-            </SelectItem>
-
-            {monthOptions.map(
-              (month) => (
+      <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-line/15 bg-surface p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-soft sm:pl-1">
+            Period
+          </span>
+          <div className="w-full sm:w-56">
+            <Select
+              value={selectedMonth}
+              onValueChange={handleMonthChange}
+            >
+              <SelectItem value="all">
+                All months
+              </SelectItem>
+              {monthOptions.map((month) => (
                 <SelectItem
                   key={month}
                   value={month}
                 >
-                  {formatMonthLabel(
-                    month,
-                  )}
+                  {formatMonthLabel(month)}
                 </SelectItem>
-              ),
-            )}
-          </Select>
-        </div>
-      </div>
-
-      {/* =====================================================
-          BANK ACCOUNT
-          ===================================================== */}
-      <div className="mb-4 flex flex-col gap-4 rounded-2xl border border-line/15 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">
-            Account
-          </p>
-
-          <p className="mt-1 text-xs text-ink-soft">
-            A transaction can be associated
-            with an account. Recorded balance
-            is managed separately.
-          </p>
+              ))}
+            </Select>
+          </div>
         </div>
 
-        <Button
-          variant="outline"
-          onClick={() =>
-            window.dispatchEvent(
-              new CustomEvent(
-                "life-planner:navigate",
-                {
-                  detail:
-                    "bank-accounts",
-                },
-              ),
-            )
-          }
-        >
-          <Landmark size={15} />
-          Manage accounts
-        </Button>
-      </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-line/10 pt-2.5 sm:border-t-0 sm:pt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent(
+                  "life-planner:navigate",
+                  {
+                    detail: "bank-accounts",
+                  },
+                ),
+              )
+            }
+          >
+            <Landmark size={14} />
+            Manage accounts
+          </Button>
 
-      {/* =====================================================
-          PET
-          ===================================================== */}
-      <div className="mb-4 flex flex-col gap-4 rounded-2xl border border-line/15 bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold">
-            Pet expenses
-          </p>
-
-          <p className="mt-1 text-xs text-ink-soft">
-            Link a transaction to one of
-            your pet profiles.
-          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent(
+                  "life-planner:navigate",
+                  {
+                    detail: "pets",
+                  },
+                ),
+              )
+            }
+          >
+            <PawPrint size={14} />
+            Manage pets
+          </Button>
         </div>
-
-        <Button
-          variant="outline"
-          onClick={() =>
-            window.dispatchEvent(
-              new CustomEvent(
-                "life-planner:navigate",
-                {
-                  detail: "pets",
-                },
-              ),
-            )
-          }
-        >
-          <PawPrint size={15} />
-          Manage pets
-        </Button>
       </div>
 
       {/* =====================================================
@@ -1098,7 +1057,7 @@ export function Finance() {
           categorySpending={categorySpending}
           selectedMonthLabel={
             selectedMonth === "all"
-              ? "Semua Bulan"
+              ? "All months"
               : formatMonthLabel(selectedMonth)
           }
           onOpenManage={() => setBudgetDialogOpen(true)}
@@ -1391,7 +1350,7 @@ export function Finance() {
             </div>
 
             {hasMore && (
-              <div className="flex items-center justify-center border-t border-line/10 p-4 bg-muted/20">
+              <div className="flex items-center justify-center border-t border-line/10 p-4 pb-7 bg-muted/20">
                 <Button
                   variant="outline"
                   onClick={loadMore}
@@ -1653,7 +1612,7 @@ function IconButton({
       title={label}
       onClick={onClick}
       className={[
-        "grid h-8 w-8 place-items-center rounded-lg border transition",
+        "relative grid h-8 w-8 place-items-center rounded-lg border transition duration-150 touch-manipulation select-none active:scale-95 before:absolute before:-inset-2 before:content-['']",
 
         danger
           ? "border-transparent text-negative hover:border-negative/25 hover:bg-negative/10"

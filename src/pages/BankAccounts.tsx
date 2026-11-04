@@ -514,6 +514,7 @@ export function BankAccounts() {
             <Label>Recorded balance</Label>
             <Input
               type="number"
+              inputMode="numeric"
               min="0"
               value={form.balance}
               onChange={(event) =>

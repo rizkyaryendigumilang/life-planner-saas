@@ -199,7 +199,7 @@ export default function ScanBillDialog({
 
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-line/[.07]">
               <div
-                className="h-full bg-ink transition-all"
+                className="h-full bg-ink transition-[width] duration-200 ease-out"
                 style={{ width: `${Math.max(4, Math.round(progress * 100))}%` }}
               />
             </div>

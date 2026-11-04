@@ -288,6 +288,7 @@ export default function AddTransactionDialog({
 
           <Input
             type="number"
+            inputMode="numeric"
             min="0"
             value={amount}
             onChange={(event) =>

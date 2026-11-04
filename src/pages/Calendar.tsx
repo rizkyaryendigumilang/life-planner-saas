@@ -392,8 +392,8 @@ export function Calendar() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Calendar</h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
-            Setiap tanggal penting dari planner, perjalanan, goal, dan experience dalam satu tampilan. Feed-nya bisa
-            disinkronkan ke kalender iPhone.
+            Every milestone from your planner, trips, goals, and experiences in one unified view. Sync effortlessly with
+            your calendar feed.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -419,7 +419,7 @@ export function Calendar() {
                 <ChevronRight size={17} />
               </Button>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex w-full items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none sm:w-auto sm:flex-wrap sm:pb-0">
               {KIND_ORDER.map((kind) => {
                 const meta = KIND_META[kind];
                 const on = visible[kind];

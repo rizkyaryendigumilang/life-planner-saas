@@ -169,7 +169,7 @@ export function BudgetOverviewCard({
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full rounded-full transition-all duration-300 ${
+                  className={`h-full rounded-full transition-[width] duration-300 ${
                     summary.overallPercentage > 100
                       ? "bg-rose-500"
                       : summary.overallPercentage > 75
@@ -219,7 +219,7 @@ export function BudgetOverviewCard({
                   {/* Progress Bar */}
                   <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full transition-all duration-300 ${
+                      className={`h-full rounded-full transition-[width] duration-300 ${
                         isOver
                           ? "bg-rose-500"
                           : isNear

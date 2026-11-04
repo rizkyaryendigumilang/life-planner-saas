@@ -12,11 +12,11 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 export function Button({ className, variant = "primary", size = "md", type = "button", ...props }: ButtonProps) {
   const variants = {
-    primary: "bg-accent text-accent-ink hover:opacity-90 active:translate-y-px",
-    secondary: "bg-muted text-ink hover:bg-line/[.07]",
-    outline: "border border-line/15 bg-surface text-ink hover:bg-muted",
-    ghost: "bg-transparent text-ink-soft hover:bg-line/[.06] hover:text-ink",
-    danger: "border border-negative/25 bg-negative/10 text-negative hover:bg-negative/[.16]",
+    primary: "bg-accent text-accent-ink hover:opacity-90 active:scale-[0.98] active:translate-y-px",
+    secondary: "bg-muted text-ink hover:bg-line/[.07] active:scale-[0.98] active:translate-y-px",
+    outline: "border border-line/15 bg-surface text-ink hover:bg-muted active:scale-[0.98] active:translate-y-px",
+    ghost: "bg-transparent text-ink-soft hover:bg-line/[.06] hover:text-ink active:scale-[0.98] active:translate-y-px",
+    danger: "border border-negative/25 bg-negative/10 text-negative hover:bg-negative/[.16] active:scale-[0.98] active:translate-y-px",
   } as const;
   const sizes = {
     sm: "relative min-h-8 gap-1.5 rounded-lg px-3 text-xs before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']",
@@ -28,7 +28,7 @@ export function Button({ className, variant = "primary", size = "md", type = "bu
     <button
       type={type}
       className={cx(
-        "inline-flex items-center justify-center font-medium transition duration-150 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center font-medium select-none transition duration-150 disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         sizes[size],
         className,
@@ -201,10 +201,15 @@ export function Select({
   useEffect(() => {
     if (!open) return;
     position();
-    const onReflow = () => position();
-    window.addEventListener("resize", onReflow);
-    window.addEventListener("scroll", onReflow, true);
+    let rafId = 0;
+    const onReflow = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => position());
+    };
+    window.addEventListener("resize", onReflow, { passive: true });
+    window.addEventListener("scroll", onReflow, { capture: true, passive: true });
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("resize", onReflow);
       window.removeEventListener("scroll", onReflow, true);
     };
@@ -227,6 +232,8 @@ export function Select({
     const match = options.findIndex((option) => option.value === current && !option.disabled);
     setActive(match >= 0 ? match : 0);
     if (!searchable) return;
+    const isFinePointer = typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches;
+    if (!isFinePointer) return;
     const timer = window.setTimeout(() => searchRef.current?.focus(), 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -321,7 +328,10 @@ export function Select({
             tabIndex={-1}
             onKeyDown={onPanelKeyDown}
             style={{ left: panel.left, top: panel.top, bottom: panel.bottom, width: panel.width, maxHeight: panel.maxHeight }}
-            className="fixed z-[200] flex flex-col overflow-hidden rounded-xl border border-line/15 bg-surface p-1.5 shadow-pop outline-none"
+            className={cx(
+              "fixed z-[200] flex flex-col overflow-hidden rounded-xl border border-line/15 bg-surface p-1.5 shadow-pop outline-none transition duration-150 ease-out animate-in fade-in-0 zoom-in-95",
+              panel.bottom !== undefined ? "origin-bottom" : "origin-top",
+            )}
           >
             {searchable && (
               <div className="relative mb-1">
@@ -335,7 +345,7 @@ export function Select({
                   }}
                   placeholder="Search"
                   aria-label="Search options"
-                  className="h-8 w-full rounded-lg border border-line/15 bg-canvas pl-8 pr-7 text-xs text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/35"
+                  className="h-8 w-full rounded-lg border border-line/15 bg-canvas pl-8 pr-7 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/35"
                 />
                 {query && (
                   <button
@@ -451,7 +461,12 @@ export function Dialog({
     document.addEventListener("keydown", handleKey);
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const t = window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>("input,button,select,textarea")?.focus(), 20);
+    const isFinePointer = typeof window !== "undefined" && window.matchMedia("(pointer: fine)").matches;
+    const t = window.setTimeout(() => {
+      if (isFinePointer) {
+        dialogRef.current?.querySelector<HTMLElement>("input,button,select,textarea")?.focus();
+      }
+    }, 20);
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = oldOverflow;
