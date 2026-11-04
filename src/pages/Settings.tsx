@@ -10,7 +10,6 @@ import {
   Trash2,
   RotateCcw,
   Smartphone,
-  Sparkles,
   Share,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -213,13 +212,7 @@ export function Settings() {
                 <BrandLogo variant="mark" size="md" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-ink">Pasang ke Layar Utama</h2>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-line/15 bg-surface px-2 py-0.5 text-[10px] font-medium text-ink-soft">
-                    <Sparkles size={11} className="text-amber-500" />
-                    1-Klik PWA
-                  </span>
-                </div>
+                <h2 className="font-semibold text-ink">Pasang ke Layar Utama</h2>
                 <p className="mt-0.5 text-xs text-ink-soft">
                   Akses instan dari Home Screen ponsel, tablet, atau komputer Anda.
                 </p>
@@ -414,7 +407,7 @@ export function Settings() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="rounded-md border border-line/15 bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+                          <span className="rounded-md border border-line/15 bg-muted px-2 py-0.5 text-[11px] font-medium text-ink-soft">
                             {item.typeLabel}
                           </span>
                           <p className="truncate text-sm font-medium text-ink">{item.title}</p>

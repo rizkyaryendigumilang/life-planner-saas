@@ -392,8 +392,7 @@ export function Calendar() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Calendar</h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
-            Every milestone from your planner, trips, goals, and experiences in one unified view. Sync effortlessly with
-            your calendar feed.
+            Schedule and deadlines across your planner, trips, goals, and experiences.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -538,7 +537,7 @@ export function Calendar() {
           <Card className="p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[.12em] text-ink-faint">
+                <p className="text-xs font-medium text-ink-soft">
                   {relativeLabel(selected, today) || "Selected day"}
                 </p>
                 <p className="mt-1 text-sm font-medium text-ink">{readableDate(selected)}</p>
@@ -621,7 +620,7 @@ export function Calendar() {
 
               <div className="rounded-lg border border-line/15 bg-canvas px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[10px] font-medium uppercase tracking-[.1em] text-ink-faint">Subscribe URL</p>
+                  <p className="text-xs font-medium text-ink-soft">Subscribe URL</p>
                   <span
                     className={
                       "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium " +

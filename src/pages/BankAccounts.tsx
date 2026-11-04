@@ -296,7 +296,7 @@ export function BankAccounts() {
       <Card className="border-line/15 bg-muted">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
+            <p className="text-xs font-medium text-ink-soft">
               Total recorded balance
             </p>
 

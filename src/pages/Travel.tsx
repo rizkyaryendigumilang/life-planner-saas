@@ -10,10 +10,17 @@ import type { Itinerary, Trip } from "../types";
 export function Travel(){
  const [trips,setTrips]=useState<Trip[]>([]);const [itins,setItins]=useState<Itinerary[]>([]);const [open,setOpen]=useState(false);const [selected,setSelected]=useState<Trip|null>(null);
  useEffect(()=>{(async()=>{try{const [a,b]=await Promise.all([pb.collection("travel_trips").getList<Trip>(1,20,{sort:"start_date"}),pb.collection("itineraries").getList<Itinerary>(1,100,{sort:"date,start_time"})]);setTrips(a.items);setItins(b.items)}catch{}})()},[]);
- const next=trips.filter(t=>new Date(t.start_date)>=new Date()).sort((a,b)=>+new Date(a.start_date)-+new Date(b.start_date))[0];
- const countdown=next?Math.max(0,Math.ceil((+new Date(next.start_date)-Date.now())/86400000)):null;
- const current=selected||next;
- const tripItems=current?itins.filter(i=>i.trip===current.id):[];
+ const { next, countdown } = useMemo(() => {
+   const now = new Date();
+   const upcoming = trips
+     .filter((t) => new Date(t.start_date) >= now)
+     .sort((a, b) => +new Date(a.start_date) - +new Date(b.start_date));
+   const n = upcoming[0] || null;
+   const cd = n ? Math.max(0, Math.ceil((+new Date(n.start_date) - Date.now()) / 86400000)) : null;
+   return { next: n, countdown: cd };
+ }, [trips]);
+ const current = selected || next;
+ const tripItems = useMemo(() => (current ? itins.filter((i) => i.trip === current.id) : []), [current, itins]);
  function exportTrip() {
    if (!current) return;
 

@@ -171,38 +171,28 @@ export function Planner() {
     today.setHours(0, 0, 0, 0);
 
     return tasks.filter((t) => {
-      const match =
-        !q ||
-        `${t.title} ${t.description || ""} ${t.category || ""} ${
-          t.tags || ""
-        }`
-          .toLowerCase()
-          .includes(q);
-
-      if (!match) return false;
-
-      if (filter === "Inbox") {
-        return t.status === "Inbox";
-      }
+      if (filter === "Inbox" && t.status !== "Inbox") return false;
 
       if (filter === "Today") {
         if (!t.due_date || t.status === "Done") return false;
-
         const d = new Date(t.due_date);
         d.setHours(0, 0, 0, 0);
-
-        return d.getTime() === today.getTime();
+        if (d.getTime() !== today.getTime()) return false;
       }
 
       if (filter === "Upcoming") {
-        return (
-          !!t.due_date &&
-          new Date(t.due_date) >= today &&
-          t.status !== "Done"
-        );
+        if (!t.due_date || t.status === "Done") return false;
+        if (new Date(t.due_date) < today) return false;
       }
 
-      return true;
+      if (!q) return true;
+
+      if (t.title.toLowerCase().includes(q)) return true;
+      if (t.description && t.description.toLowerCase().includes(q)) return true;
+      if (t.category && t.category.toLowerCase().includes(q)) return true;
+      if (t.tags && t.tags.toLowerCase().includes(q)) return true;
+
+      return false;
     });
   }, [tasks, search, filter]);
 

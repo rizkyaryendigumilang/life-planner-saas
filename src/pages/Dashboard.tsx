@@ -465,27 +465,16 @@ export function Dashboard({
     [trips, range],
   );
 
-  const income =
-    filteredExpenses
-      .filter(
-        (x) => x.type === "Income",
-      )
-      .reduce(
-        (sum, x) =>
-          sum + Number(x.amount || 0),
-        0,
-      );
-
-  const out =
-    filteredExpenses
-      .filter(
-        (x) => x.type === "Expense",
-      )
-      .reduce(
-        (sum, x) =>
-          sum + Number(x.amount || 0),
-        0,
-      );
+  const { income, out } = useMemo(() => {
+    let inc = 0;
+    let exp = 0;
+    for (const x of filteredExpenses) {
+      const amt = Number(x.amount || 0);
+      if (x.type === "Income") inc += amt;
+      else if (x.type === "Expense") exp += amt;
+    }
+    return { income: inc, out: exp };
+  }, [filteredExpenses]);
 
   const chartData = useMemo(() => {
     if (!filteredExpenses.length) {
@@ -557,50 +546,38 @@ export function Dashboard({
     timeframe,
   ]);
 
-  const openTasks =
-    filteredTasks.filter(
-      (x) => x.status !== "Done",
-    ).length;
+  const openTasks = useMemo(
+    () => filteredTasks.filter((x) => x.status !== "Done").length,
+    [filteredTasks],
+  );
 
-  const portfolio =
-    investments.filter(
-      (x) => x.mode === "Portfolio",
-    );
+  const { portfolio, watchlist } = useMemo(() => {
+    const p: Investment[] = [];
+    const w: Investment[] = [];
+    for (const item of investments) {
+      if (item.mode === "Portfolio") p.push(item);
+      else if (item.mode === "Watchlist") w.push(item);
+    }
+    return { portfolio: p, watchlist: w };
+  }, [investments]);
 
-  const watchlist =
-    investments.filter(
-      (x) => x.mode === "Watchlist",
-    );
-
-  const portfolioValue =
-    Math.round(
-      portfolio.reduce(
-        (sum, item) => {
-          const quote = quotes.get(
-            `${item.asset_type}:${item.symbol.toUpperCase()}`,
-          );
-
-          return (
-            sum +
-            (quote?.price != null
-              ? Number(
-                  item.quantity || 0,
-                ) * quote.price
-              : 0)
-          );
-        },
-        0,
-      ) * 100,
-    ) / 100;
-
-  const hasPortfolioMarketValue =
-    portfolio.some((item) => {
-      return (
-        quotes.get(
-          `${item.asset_type}:${item.symbol.toUpperCase()}`,
-        )?.price != null
+  const { portfolioValue, hasPortfolioMarketValue } = useMemo(() => {
+    let sum = 0;
+    let hasMarket = false;
+    for (const item of portfolio) {
+      const quote = quotes.get(
+        `${item.asset_type}:${item.symbol.toUpperCase()}`,
       );
-    });
+      if (quote?.price != null) {
+        hasMarket = true;
+        sum += Number(item.quantity || 0) * quote.price;
+      }
+    }
+    return {
+      portfolioValue: Math.round(sum * 100) / 100,
+      hasPortfolioMarketValue: hasMarket,
+    };
+  }, [portfolio, quotes]);
 
   const currentHour = new Date().getHours();
   const timeGreeting = currentHour < 12 ? "Good morning" : currentHour < 18 ? "Good afternoon" : "Good evening";
@@ -817,12 +794,12 @@ export function Dashboard({
                           <div className="h-1.5 w-1.5 rotate-45 bg-surface-elevated/95 dark:bg-muted border-r border-b border-line/15 -mt-1" />
                         </div>
 
-                        {/* Bar with emerald/rose gradient */}
+                        {/* Bar with calibrated semantic token */}
                         <div
-                          className={`w-full max-w-10 rounded-t-md transition-all duration-200 cursor-pointer group-hover:scale-y-105 origin-bottom bg-gradient-to-t ${
+                          className={`w-full max-w-10 rounded-t-sm transition-colors duration-150 cursor-pointer ${
                             item.value >= 0
-                              ? "from-emerald-600 to-emerald-400 hover:from-emerald-500 hover:to-emerald-300 shadow-xs shadow-emerald-500/15"
-                              : "from-rose-600 to-rose-400 hover:from-rose-500 hover:to-rose-300 shadow-xs shadow-rose-500/15"
+                              ? "bg-positive/85 hover:bg-positive"
+                              : "bg-negative/85 hover:bg-negative"
                           } ${isSelected ? "ring-2 ring-accent" : ""}`}
                           style={{
                             height: `${height}%`,

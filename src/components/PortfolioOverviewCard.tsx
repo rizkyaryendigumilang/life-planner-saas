@@ -76,7 +76,7 @@ export function PortfolioOverviewCard() {
   }, []);
 
   const totals = useMemo(() => {
-    return items.reduce(
+    const res = items.reduce(
       (acc, item) => {
         const invested =
           Number(item.quantity || 0) *
@@ -106,6 +106,12 @@ export function PortfolioOverviewCard() {
         hasCurrent: false,
       },
     );
+
+    return {
+      invested: Math.round(res.invested * 100) / 100,
+      current: Math.round(res.current * 100) / 100,
+      hasCurrent: res.hasCurrent,
+    };
   }, [items, quotes]);
 
   const toggleHidden = () => {

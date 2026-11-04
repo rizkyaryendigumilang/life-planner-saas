@@ -12,6 +12,7 @@ import {
   EyeOff,
   FileText,
   KeyRound,
+  Loader2,
   LogOut,
   Mail,
   Plus,
@@ -736,22 +737,30 @@ export function Admin() {
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return users.filter((u) => {
-      const matchSearch =
-        u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      if (statusFilter !== "all" && u.status !== statusFilter) return false;
+      if (!q) return true;
 
-      const matchStatus =
-        statusFilter === "all" ? true : u.status === statusFilter;
-
-      return matchSearch && matchStatus;
+      return (
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        Boolean(u.name && u.name.toLowerCase().includes(q))
+      );
     });
   }, [users, searchQuery, statusFilter]);
 
-  const customerCount = users.filter((user) => user.role === "customer").length;
-  const adminCount = users.filter((user) => user.role === "superadmin").length;
-  const suspendedCount = users.filter((user) => user.status === "suspended").length;
+  const { customerCount, adminCount, suspendedCount } = useMemo(() => {
+    let cust = 0;
+    let adm = 0;
+    let susp = 0;
+    for (const user of users) {
+      if (user.role === "customer") cust += 1;
+      if (user.role === "superadmin") adm += 1;
+      if (user.status === "suspended") susp += 1;
+    }
+    return { customerCount: cust, adminCount: adm, suspendedCount: susp };
+  }, [users]);
 
   return (
     <div className="animate-rise space-y-6">
@@ -900,7 +909,7 @@ export function Admin() {
           {/* Summary Stat Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <Card className="p-5">
-              <p className="text-xs uppercase tracking-[.15em] text-ink-soft">
+              <p className="text-xs font-medium text-ink-soft">
                 Total Akun
               </p>
               <p className="mt-2 text-2xl font-semibold">
@@ -909,7 +918,7 @@ export function Admin() {
             </Card>
 
             <Card className="p-5">
-              <p className="text-xs uppercase tracking-[.15em] text-ink-soft">
+              <p className="text-xs font-medium text-ink-soft">
                 Pelanggan (Customer)
               </p>
               <p className="mt-2 text-2xl font-semibold">
@@ -918,7 +927,7 @@ export function Admin() {
             </Card>
 
             <Card className="p-5">
-              <p className="text-xs uppercase tracking-[.15em] text-ink-soft">
+              <p className="text-xs font-medium text-ink-soft">
                 Superadmin
               </p>
               <p className="mt-2 text-2xl font-semibold">
@@ -927,7 +936,7 @@ export function Admin() {
             </Card>
 
             <Card className="p-5">
-              <p className="text-xs uppercase tracking-[.15em] text-ink-soft">
+              <p className="text-xs font-medium text-ink-soft">
                 Ditangguhkan (Suspended)
               </p>
               <p className="mt-2 text-2xl font-semibold text-negative">
@@ -1486,10 +1495,11 @@ export function Admin() {
                               onClick={() => downloadBackup(b.key)}
                               disabled={downloadingKey === b.key}
                             >
-                              <Download
-                                size={14}
-                                className={downloadingKey === b.key ? "animate-bounce" : ""}
-                              />
+                              {downloadingKey === b.key ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Download size={14} />
+                              )}
                               Unduh .ZIP
                             </Button>
 
@@ -1774,7 +1784,7 @@ export function Admin() {
 
                 {!mailSettings.smtp.enabled && (
                   <p className="text-xs text-caution">
-                    ⚠️ Aktifkan dan simpan SMTP terlebih dahulu sebelum mengirim tes.
+                    Aktifkan dan simpan konfigurasi SMTP sebelum mengirim tes.
                   </p>
                 )}
               </div>

@@ -19,7 +19,16 @@ export function Pets() {
     try { const r = await pb.collection("pets").getList<Pet>(1, 100, { sort: "name" }); setPets(r.items); } catch {}
   };
   useEffect(() => { load(); }, []);
-  const filtered = useMemo(() => pets.filter(p => `${p.name} ${p.species} ${p.breed || ""}`.toLowerCase().includes(search.toLowerCase())), [pets, search]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return pets;
+    return pets.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.species.toLowerCase().includes(q) ||
+        (p.breed && p.breed.toLowerCase().includes(q)),
+    );
+  }, [pets, search]);
   const photo = (p: Pet) => p.photo ? pb.files.getURL(p, p.photo, { thumb: "300x300" }) : "";
   async function remove(p: Pet) { try { await pb.collection("pets").delete(p.id); setPets(x => x.filter(i => i.id !== p.id)); toast.success(`${p.name} removed`); } catch { toast.error("Could not remove pet"); } }
   return <div className="animate-rise">

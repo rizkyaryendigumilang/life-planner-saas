@@ -47,18 +47,23 @@ export function BudgetOverviewCard({
 
   // Total statistik untuk kategori yang dianggarkan
   const summary = useMemo(() => {
-    const totalBudget = activeBudgetEntries.reduce((sum, item) => sum + item.limit, 0);
-    const totalSpent = activeBudgetEntries.reduce((sum, item) => sum + item.spent, 0);
-    const totalRemaining = totalBudget - totalSpent;
-    const overallPercentage = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-    const overbudgetCount = activeBudgetEntries.filter((item) => item.isOverbudget).length;
+    let budget = 0;
+    let spent = 0;
+    let overCount = 0;
+    for (const item of activeBudgetEntries) {
+      budget += item.limit;
+      spent += item.spent;
+      if (item.isOverbudget) overCount += 1;
+    }
+    const totalRemaining = budget - spent;
+    const overallPercentage = budget > 0 ? Math.round((spent / budget) * 100) : 0;
 
     return {
-      totalBudget,
-      totalSpent,
+      totalBudget: budget,
+      totalSpent: spent,
       totalRemaining,
       overallPercentage,
-      overbudgetCount,
+      overbudgetCount: overCount,
     };
   }, [activeBudgetEntries]);
 
@@ -171,10 +176,10 @@ export function BudgetOverviewCard({
                 <div
                   className={`h-full rounded-full transition-[width] duration-300 ${
                     summary.overallPercentage > 100
-                      ? "bg-rose-500"
+                      ? "bg-negative"
                       : summary.overallPercentage > 75
-                        ? "bg-amber-500"
-                        : "bg-emerald-500"
+                        ? "bg-caution"
+                        : "bg-positive"
                   }`}
                   style={{ width: `${Math.min(summary.overallPercentage, 100)}%` }}
                 />
@@ -221,10 +226,10 @@ export function BudgetOverviewCard({
                     <div
                       className={`h-full rounded-full transition-[width] duration-300 ${
                         isOver
-                          ? "bg-rose-500"
+                          ? "bg-negative"
                           : isNear
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
+                            ? "bg-caution"
+                            : "bg-positive"
                       }`}
                       style={{ width: `${Math.min(item.percentage, 100)}%` }}
                     />

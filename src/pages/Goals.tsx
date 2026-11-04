@@ -253,25 +253,20 @@ export function Goals() {
     [goals],
   );
 
-  const totalTarget = activeGoals.reduce(
-    (sum, goal) =>
-      sum + goal.targetAmount,
-    0,
-  );
-
-  const totalCurrent = activeGoals.reduce(
-    (sum, goal) =>
-      sum + goal.currentAmount,
-    0,
-  );
-
-  const overallProgress =
-    totalTarget > 0
-      ? Math.round(
-          (totalCurrent / totalTarget) *
-            100,
-        )
-      : 0;
+  const { totalTarget, totalCurrent, overallProgress } = useMemo(() => {
+    let target = 0;
+    let current = 0;
+    for (const goal of activeGoals) {
+      target += goal.targetAmount;
+      current += goal.currentAmount;
+    }
+    const progress = target > 0 ? Math.round((current / target) * 100) : 0;
+    return {
+      totalTarget: target,
+      totalCurrent: current,
+      overallProgress: progress,
+    };
+  }, [activeGoals]);
 
   async function handleSaveGoal(
     data: GoalFormData,
@@ -753,7 +748,7 @@ function GoalCard({
 
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-accent transition-all"
+            className="h-full rounded-full bg-accent transition-[width] duration-300"
             style={{
               width: `${progress}%`,
             }}
@@ -951,7 +946,7 @@ function GoalDetail({
 
           {goal.notes && (
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.1em] text-ink-faint">
+              <p className="text-xs font-medium text-ink-soft">
                 Notes
               </p>
 
@@ -1053,7 +1048,7 @@ function DetailStat({
 }) {
   return (
     <div className="rounded-lg bg-muted p-4">
-      <p className="text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+      <p className="text-xs font-medium text-ink-soft">
         {label}
       </p>
 
@@ -1073,7 +1068,7 @@ function DetailItem({
 }) {
   return (
     <div className="rounded-lg border border-line/10 p-4">
-      <p className="text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+      <p className="text-xs font-medium text-ink-soft">
         {label}
       </p>
 

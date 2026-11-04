@@ -1196,7 +1196,7 @@ export function Finance() {
                     key={monthKey}
                   >
                     <div className="flex items-center justify-between bg-muted px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[.12em] text-ink-soft">
+                      <p className="text-xs font-semibold text-ink">
                         {formatMonthLabel(
                           monthKey,
                         )}
@@ -1449,7 +1449,7 @@ function MonthRows({
           className="bg-muted px-5 py-3"
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[.12em] text-ink-soft">
+            <p className="text-xs font-semibold text-ink">
               {formatMonthLabel(
                 monthKey,
               )}

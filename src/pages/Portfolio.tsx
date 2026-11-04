@@ -52,11 +52,18 @@ export function Portfolio() {
     }
   };
 
-  const portfolio = items.filter((item) => item.mode === "Portfolio");
-  const watchlist = items.filter((item) => item.mode === "Watchlist");
+  const { portfolio, watchlist } = useMemo(() => {
+    const p: Investment[] = [];
+    const w: Investment[] = [];
+    for (const item of items) {
+      if (item.mode === "Portfolio") p.push(item);
+      else if (item.mode === "Watchlist") w.push(item);
+    }
+    return { portfolio: p, watchlist: w };
+  }, [items]);
 
   const totals = useMemo(() => {
-    return portfolio.reduce(
+    const res = portfolio.reduce(
       (acc, item) => {
         const invested = Number(item.quantity || 0) * Number(item.average_price || 0);
         const quote = quotes.get(item.symbol.toUpperCase());
@@ -72,6 +79,11 @@ export function Portfolio() {
       },
       { invested: 0, current: 0, hasCurrent: false },
     );
+    return {
+      invested: Math.round(res.invested * 100) / 100,
+      current: Math.round(res.current * 100) / 100,
+      hasCurrent: res.hasCurrent,
+    };
   }, [portfolio, quotes]);
 
   const save = async (data: Record<string, unknown>) => {

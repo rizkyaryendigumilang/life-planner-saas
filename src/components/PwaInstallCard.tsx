@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, Download, Laptop, Share, Smartphone, Sparkles, Tablet } from "lucide-react";
+import { CheckCircle2, Download, Laptop, Share, Smartphone, Tablet } from "lucide-react";
 import { Button, Card } from "./ui";
 import { BrandLogo } from "./BrandLogo";
 import { usePwa } from "../hooks/use-pwa";
@@ -26,15 +26,9 @@ export function PwaInstallCard() {
               <BrandLogo variant="mark" size="md" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-semibold text-ink sm:text-lg">
-                  LifePlanner Mobile & Desktop App
-                </h2>
-                <span className="inline-flex items-center gap-1 rounded-full border border-line/15 bg-surface px-2 py-0.5 text-[10px] font-medium text-ink-soft">
-                  <Sparkles size={11} className="text-amber-500" />
-                  PWA
-                </span>
-              </div>
+              <h2 className="text-base font-semibold text-ink sm:text-lg">
+                LifePlanner Mobile & Desktop App
+              </h2>
               <p className="mt-0.5 text-xs text-ink-soft">
                 Akses cepat langsung dari layar utama tanpa address bar browser.
               </p>

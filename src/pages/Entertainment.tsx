@@ -320,20 +320,20 @@ export function Entertainment() {
     );
   }, [activeTab, experiences]);
 
-  const upcoming = filteredExperiences.filter(
-    (item) =>
-      item.status === "Planned" ||
-      item.status === "Booked",
-  );
-
-  const completed = filteredExperiences.filter(
-    (item) => item.status === "Completed",
-  );
-
-  const totalUpcomingCost = upcoming.reduce(
-    (sum, item) => sum + item.estimatedCost,
-    0,
-  );
+  const { upcoming, completed, totalUpcomingCost } = useMemo(() => {
+    const up: Experience[] = [];
+    const comp: Experience[] = [];
+    let cost = 0;
+    for (const item of filteredExperiences) {
+      if (item.status === "Planned" || item.status === "Booked") {
+        up.push(item);
+        cost += item.estimatedCost;
+      } else if (item.status === "Completed") {
+        comp.push(item);
+      }
+    }
+    return { upcoming: up, completed: comp, totalUpcomingCost: cost };
+  }, [filteredExperiences]);
 
   async function handleAddExperience(
     data: ExperienceFormData,
@@ -882,7 +882,7 @@ function SummaryCard({
 }) {
   return (
     <div className="rounded-xl border border-line/15 bg-surface p-5">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-ink-faint">
+      <p className="text-xs font-medium text-ink-soft">
         {label}
       </p>
 
@@ -964,7 +964,7 @@ function ExperienceCard({
 
       <div className="mt-5 flex items-end justify-between border-t border-line/10 pt-4">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+          <p className="text-xs font-medium text-ink-soft">
             Budget
           </p>
 
@@ -1107,7 +1107,7 @@ function ExperienceDetail({
           {/* Notes */}
           {experience.notes && (
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.1em] text-ink-faint">
+              <p className="text-xs font-medium text-ink-soft">
                 Notes
               </p>
 
@@ -1390,7 +1390,7 @@ function DetailItem({
 }) {
   return (
     <div className="rounded-lg bg-muted p-4">
-      <p className="text-[11px] uppercase tracking-[0.1em] text-ink-faint">
+      <p className="text-xs font-medium text-ink-soft">
         {label}
       </p>
 
