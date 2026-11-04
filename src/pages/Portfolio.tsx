@@ -8,10 +8,6 @@ import { Badge, Button, Card } from "../components/ui";
 import { toast } from "sonner";
 import { getMarketQuotes, isMarketDataConfigured } from "../lib/marketData";
 
-function money(value: number) {
-  return formatIDR(value);
-}
-
 export function Portfolio() {
   const [items, setItems] = useState<Investment[]>([]);
   const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(new Map());
@@ -189,18 +185,18 @@ export function Portfolio() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-5">
           <p className="text-xs text-ink-soft">Invested</p>
-          <p className="mt-1 text-xl font-semibold">{money(totals.invested)}</p>
+          <p className="mt-1 text-xl font-semibold">{formatIDR(totals.invested)}</p>
         </Card>
         <Card className="p-5">
           <p className="text-xs text-ink-soft">Current value</p>
           <p className="mt-1 text-xl font-semibold">
-            {totals.hasCurrent ? money(totals.current) : "—"}
+            {totals.hasCurrent ? formatIDR(totals.current) : "—"}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-xs text-ink-soft">Unrealized P/L</p>
           <p className="mt-1 text-xl font-semibold">
-            {totals.hasCurrent ? money(totals.current - totals.invested) : "—"}
+            {totals.hasCurrent ? formatIDR(totals.current - totals.invested) : "—"}
           </p>
         </Card>
       </div>
@@ -242,14 +238,14 @@ export function Portfolio() {
                     <div>
                       <p className="text-xs text-ink-faint">Current price</p>
                       <p className="text-sm font-semibold">
-                        {quote?.price != null ? money(quote.price) : "—"}
+                        {quote?.price != null ? formatIDR(quote.price) : "—"}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-ink-faint">P/L</p>
                       <p className={`flex items-center gap-1 text-sm font-semibold ${pnl != null && pnl < 0 ? "text-negative" : pnl != null ? "text-positive" : ""}`}>
                         {pnl != null && (pnl >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />)}
-                        {pnl != null ? money(pnl) : "—"}
+                        {pnl != null ? formatIDR(pnl) : "—"}
                       </p>
                     </div>
                     <div className="flex gap-1">
@@ -293,7 +289,7 @@ export function Portfolio() {
                       </div>
                       <p className="text-sm text-ink-soft">{item.asset_name} · {item.asset_type}</p>
                     </div>
-                    <p className="font-semibold">{quote?.price != null ? money(quote.price) : "—"}</p>
+                    <p className="font-semibold">{quote?.price != null ? formatIDR(quote.price) : "—"}</p>
                     <p className={quote?.percentChange != null && quote.percentChange < 0 ? "text-negative" : "text-positive"}>
                       {quote?.percentChange != null ? `${quote.percentChange >= 0 ? "+" : ""}${quote.percentChange.toFixed(2)}%` : "—"}
                     </p>

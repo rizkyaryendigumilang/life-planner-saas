@@ -32,7 +32,7 @@ import ScanBillDialog from "../components/ScanBillDialog";
 import { BudgetOverviewCard } from "../components/BudgetOverviewCard";
 import { ManageBudgetsDialog } from "../components/ManageBudgetsDialog";
 import { getBudgets, type CategoryBudgets } from "../lib/budgets";
-import { formatIDR, formatDate } from "../lib/utils";
+import { formatIDR, formatDate, maskAccountNumber } from "../lib/utils";
 import { toast } from "sonner";
 import { recycleBin } from "../lib/recycle-bin";
 import type { BankAccount, Expense } from "../types";
@@ -78,21 +78,6 @@ function getCurrentMonthKey() {
   return `${now.getFullYear()}-${String(
     now.getMonth() + 1,
   ).padStart(2, "0")}`;
-}
-
-function maskAccountNumber(
-  accountNumber?: string,
-) {
-  if (!accountNumber) return "";
-
-  const cleaned =
-    accountNumber.replace(/\s+/g, "");
-
-  if (cleaned.length <= 4) {
-    return cleaned;
-  }
-
-  return `•••• ${cleaned.slice(-4)}`;
 }
 
 function getAccountDisplayName(
@@ -1292,36 +1277,24 @@ export function Finance() {
                               </Badge>
 
                               <div className="flex items-center gap-1">
-                                <IconButton
-                                  label="Edit"
-                                  onClick={() =>
-                                    handleEdit(
-                                      item,
-                                    )
-                                  }
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Edit"
+                                  onClick={() => handleEdit(item)}
                                 >
-                                  <Pencil
-                                    size={
-                                      15
-                                    }
-                                  />
-                                </IconButton>
+                                  <Pencil size={15} />
+                                </Button>
 
-                                <IconButton
-                                  label="Delete"
-                                  danger
-                                  onClick={() =>
-                                    setDeleteTarget(
-                                      item,
-                                    )
-                                  }
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Delete"
+                                  onClick={() => setDeleteTarget(item)}
+                                  className="text-negative hover:text-negative"
                                 >
-                                  <Trash2
-                                    size={
-                                      15
-                                    }
-                                  />
-                                </IconButton>
+                                  <Trash2 size={15} />
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -1546,65 +1519,30 @@ function MonthRows({
 
             <td className="px-5 py-4">
               <div className="flex justify-end gap-1">
-                <IconButton
-                  label="Edit transaction"
-                  onClick={() =>
-                    onEdit(item)
-                  }
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit transaction"
+                  onClick={() => onEdit(item)}
                 >
                   <Pencil size={15} />
-                </IconButton>
+                </Button>
 
-                <IconButton
-                  label="Delete transaction"
-                  danger
-                  onClick={() =>
-                    onDelete(item)
-                  }
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Delete transaction"
+                  onClick={() => onDelete(item)}
+                  className="text-negative hover:text-negative"
                 >
                   <Trash2 size={15} />
-                </IconButton>
+                </Button>
               </div>
             </td>
           </tr>
         );
       })}
     </>
-  );
-}
-
-/*
- * ===========================================================
- * ICON BUTTON
- * ===========================================================
- */
-function IconButton({
-  children,
-  label,
-  onClick,
-  danger = false,
-}: {
-  children: React.ReactNode;
-  label: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className={[
-        "relative grid h-8 w-8 place-items-center rounded-lg border transition duration-150 touch-manipulation select-none active:scale-95 before:absolute before:-inset-2 before:content-['']",
-
-        danger
-          ? "border-transparent text-negative hover:border-negative/25 hover:bg-negative/10"
-          : "border-transparent text-ink-soft hover:border-line/15 hover:bg-surface hover:text-ink",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }
 

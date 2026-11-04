@@ -10,8 +10,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { Button } from "../components/ui";
+import { Badge, Button, Card, Dialog, Input, Label } from "../components/ui";
 import { pb } from "../lib/pocketbase";
+import { formatCurrency, formatDate } from "../lib/utils";
 
 type GoalCategory =
   | "Financial"
@@ -93,37 +94,9 @@ const statuses: GoalStatus[] = [
   "Paused",
 ];
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(value: string) {
-  if (!value) return "";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(
-    new Date(`${value}T00:00:00`),
-  );
-}
-
 function calculateProgress(goal: Goal) {
   if (goal.targetAmount <= 0) return 0;
-
-  return Math.min(
-    100,
-    Math.round(
-      (goal.currentAmount /
-        goal.targetAmount) *
-        100,
-    ),
-  );
+  return Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
 }
 
 function mapGoal(record: any): Goal {
@@ -1182,219 +1155,123 @@ function GoalDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-4 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <Dialog
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      title={goal ? "Edit goal" : "Add goal"}
+      description="Define the target and how you want to reach it."
+      className="max-w-xl"
     >
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line/15 bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-line/10 px-6 py-5">
-          <div>
-            <h2 className="text-lg font-semibold">
-              {goal
-                ? "Edit goal"
-                : "Add goal"}
-            </h2>
-
-            <p className="mt-1 text-xs text-ink-faint">
-              Define the target and how you
-              want to reach it.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-muted"
-          >
-            ×
-          </button>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label>Goal name *</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Dana Darurat"
+            required
+          />
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 p-6"
-        >
-          <Field
-            label="Goal name"
-            required
-          >
-            <input
-              className="form-input"
-              value={name}
-              onChange={(event) =>
-                setName(event.target.value)
-              }
-              placeholder="e.g. Dana Darurat"
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Category</Label>
+            <select
+              className="h-10 w-full rounded-lg border border-line/15 bg-surface px-3 text-sm text-ink outline-none transition focus:border-ink/40"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as GoalCategory)}
+            >
+              {categories.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <Label>Priority</Label>
+            <select
+              className="h-10 w-full rounded-lg border border-line/15 bg-surface px-3 text-sm text-ink outline-none transition focus:border-ink/40"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as GoalPriority)}
+            >
+              {priorities.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Target amount *</Label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder="85000000"
               required
             />
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Category">
-              <select
-                className="form-input"
-                value={category}
-                onChange={(event) =>
-                  setCategory(
-                    event.target
-                      .value as GoalCategory,
-                  )
-                }
-              >
-                {categories.map(
-                  (item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
-                      {item}
-                    </option>
-                  ),
-                )}
-              </select>
-            </Field>
-
-            <Field label="Priority">
-              <select
-                className="form-input"
-                value={priority}
-                onChange={(event) =>
-                  setPriority(
-                    event.target
-                      .value as GoalPriority,
-                  )
-                }
-              >
-                {priorities.map(
-                  (item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
-                      {item}
-                    </option>
-                  ),
-                )}
-              </select>
-            </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Target amount"
-              required
-            >
-              <input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                className="form-input"
-                value={targetAmount}
-                onChange={(event) =>
-                  setTargetAmount(
-                    event.target.value,
-                  )
-                }
-                placeholder="85000000"
-                required
-              />
-            </Field>
-
-            <Field label="Current amount">
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                className="form-input"
-                value={currentAmount}
-                onChange={(event) =>
-                  setCurrentAmount(
-                    event.target.value,
-                  )
-                }
-                placeholder="0"
-              />
-            </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Target date">
-              <input
-                type="date"
-                className="form-input"
-                value={targetDate}
-                onChange={(event) =>
-                  setTargetDate(
-                    event.target.value,
-                  )
-                }
-              />
-            </Field>
-
-            <Field label="Status">
-              <select
-                className="form-input"
-                value={status}
-                onChange={(event) =>
-                  setStatus(
-                    event.target
-                      .value as GoalStatus,
-                  )
-                }
-              >
-                {statuses.map(
-                  (item) => (
-                    <option
-                      key={item}
-                      value={item}
-                    >
-                      {item}
-                    </option>
-                  ),
-                )}
-              </select>
-            </Field>
-          </div>
-
-          <Field label="Notes">
-            <textarea
-              className="form-input"
-              value={notes}
-              onChange={(event) =>
-                setNotes(event.target.value)
-              }
-              placeholder="Additional notes..."
+          <div>
+            <Label>Current amount</Label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="0"
+              value={currentAmount}
+              onChange={(e) => setCurrentAmount(e.target.value)}
+              placeholder="0"
             />
-          </Field>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="submit"
-              disabled={saving}
-            >
-              {saving
-                ? "Saving..."
-                : goal
-                  ? "Save changes"
-                  : "Add goal"}
-            </Button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Target date</Label>
+            <Input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <Label>Status</Label>
+            <select
+              className="h-10 w-full rounded-lg border border-line/15 bg-surface px-3 text-sm text-ink outline-none transition focus:border-ink/40"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as GoalStatus)}
+            >
+              {statuses.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <Label>Notes</Label>
+          <textarea
+            className="min-h-20 w-full rounded-lg border border-line/15 bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/40"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes..."
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : goal ? "Save changes" : "Add goal"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
@@ -1405,182 +1282,86 @@ function ContributionDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onSubmit: (
-    amount: number,
-    date: string,
-    notes: string,
-  ) => Promise<void>;
+  onSubmit: (amount: number, date: string, notes: string) => Promise<void>;
 }) {
-  const [amount, setAmount] =
-    useState("");
-  const [date, setDate] =
-    useState("");
-  const [notes, setNotes] =
-    useState("");
-  const [saving, setSaving] =
-    useState(false);
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-
     setAmount("");
-    setDate(
-      new Date()
-        .toISOString()
-        .slice(0, 10),
-    );
+    setDate(new Date().toISOString().slice(0, 10));
     setNotes("");
     setSaving(false);
   }, [open]);
 
   if (!open) return null;
 
-  async function handleSubmit(
-    event: React.FormEvent,
-  ) {
+  async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-
     const parsedAmount = Number(amount);
-
-    if (
-      !parsedAmount ||
-      parsedAmount <= 0 ||
-      !date
-    ) {
-      return;
-    }
+    if (!parsedAmount || parsedAmount <= 0 || !date) return;
 
     try {
       setSaving(true);
-
-      await onSubmit(
-        parsedAmount,
-        date,
-        notes.trim(),
-      );
+      await onSubmit(parsedAmount, date, notes.trim());
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/20 p-4 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <Dialog
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      title="Add contribution"
+      description="Add money toward this goal."
     >
-      <div className="w-full max-w-md rounded-2xl border border-line/15 bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-line/10 px-6 py-5">
-          <div>
-            <h2 className="text-lg font-semibold">
-              Add contribution
-            </h2>
-
-            <p className="mt-1 text-xs text-ink-faint">
-              Add money toward this goal.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-muted"
-          >
-            ×
-          </button>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Label>Amount *</Label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            min="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="1000000"
+            required
+          />
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-4 p-6"
-        >
-          <Field
-            label="Amount"
+        <div>
+          <Label>Date *</Label>
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             required
-          >
-            <input
-              type="number"
-              inputMode="numeric"
-              min="1"
-              className="form-input"
-              value={amount}
-              onChange={(event) =>
-                setAmount(event.target.value)
-              }
-              placeholder="1000000"
-              required
-            />
-          </Field>
+          />
+        </div>
 
-          <Field label="Date" required>
-            <input
-              type="date"
-              className="form-input"
-              value={date}
-              onChange={(event) =>
-                setDate(event.target.value)
-              }
-              required
-            />
-          </Field>
+        <div>
+          <Label>Notes</Label>
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Monthly saving"
+          />
+        </div>
 
-          <Field label="Notes">
-            <input
-              className="form-input"
-              value={notes}
-              onChange={(event) =>
-                setNotes(event.target.value)
-              }
-              placeholder="e.g. Monthly saving"
-            />
-          </Field>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-
-            <Button
-              type="submit"
-              disabled={saving}
-            >
-              {saving
-                ? "Saving..."
-                : "Add contribution"}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  required = false,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-ink-soft">
-        {label}
-        {required && " *"}
-      </span>
-
-      {children}
-    </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving..." : "Add contribution"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 

@@ -243,10 +243,6 @@ async function authenticateRequest(req, { admin = false } = {}) {
   }
 }
 
-async function isAuthorized(req) {
-  return authenticateRequest(req);
-}
-
 async function isAdminAuthorized(req) {
   return authenticateRequest(req, { admin: true });
 }
@@ -608,7 +604,7 @@ async function fetchTwelveDataQuote(symbol) {
 }
 
 app.get("/api/market-quotes", rateLimit({ windowMs: 60 * 1000, max: 30 }), async (req, res) => {
-  if (!(await isAuthorized(req))) {
+  if (!(await authenticateRequest(req))) {
     return res.status(401).json({ success: false, message: "Please sign in to view market quotes." });
   }
 
@@ -712,7 +708,7 @@ function getLanBase() {
 // screen needs to know which one to hand out instead of guessing.
 app.get("/api/network-info", async (req, res) => {
   try {
-    if (!(await isAuthorized(req))) {
+    if (!(await authenticateRequest(req))) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
@@ -740,7 +736,7 @@ app.get("/api/network-info", async (req, res) => {
 // instead of silently dropping a tunnel that is currently working.
 app.post("/api/public-base", async (req, res) => {
   try {
-    if (!(await isAuthorized(req))) {
+    if (!(await authenticateRequest(req))) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
@@ -762,7 +758,7 @@ app.post("/api/public-base", async (req, res) => {
 
 app.get("/api/shortcut-tokens", async (req, res) => {
   try {
-    if (!(await isAuthorized(req))) {
+    if (!(await authenticateRequest(req))) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
     await authenticatePocketBase();
@@ -792,7 +788,7 @@ app.get("/api/shortcut-tokens", async (req, res) => {
 
 app.post("/api/shortcut-tokens", async (req, res) => {
   try {
-    if (!(await isAuthorized(req))) {
+    if (!(await authenticateRequest(req))) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
     const parsed = shortcutTokenCreateSchema.safeParse(req.body);
@@ -839,7 +835,7 @@ app.post("/api/shortcut-tokens", async (req, res) => {
 
 app.delete("/api/shortcut-tokens/:id", async (req, res) => {
   try {
-    if (!(await isAuthorized(req))) {
+    if (!(await authenticateRequest(req))) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
     await authenticatePocketBase();
@@ -1013,7 +1009,7 @@ async function collectCalendarEvents(userId) {
 
 app.get("/api/calendar.ics", rateLimit({ windowMs: 60 * 1000, max: 60 }), async (req, res) => {
   try {
-    const sessionAuthorized = await isAuthorized(req);
+    const sessionAuthorized = await authenticateRequest(req);
     const shortcutAuthorized = sessionAuthorized ? false : await authenticateShortcutToken(req, { allowQuery: true });
     if (!sessionAuthorized && !shortcutAuthorized) {
       return res.status(401).json({
@@ -1103,7 +1099,7 @@ app.post(
          API authorization
       ----------------------------------------- */
 
-      const sessionAuthorized = await isAuthorized(req);
+      const sessionAuthorized = await authenticateRequest(req);
       const shortcutAuthorized = sessionAuthorized ? false : await authenticateShortcutToken(req);
       if (!sessionAuthorized && !shortcutAuthorized) {
         return res.status(401).json({

@@ -3,6 +3,7 @@ import { motion, useMotionValue, useTransform } from "framer-motion";
 import { Eye, EyeOff, Copy, Check, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import "./swipe-card.css";
+import { formatIDR } from "../lib/utils";
 import type { BankAccount } from "../types";
 
 /**
@@ -70,14 +71,6 @@ export function getBankGradient(bankName: string = "", accountType: string = "",
   ];
 
   return defaultGradients[index % defaultGradients.length];
-}
-
-function formatIDR(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
 }
 
 function getInitials(name: string) {

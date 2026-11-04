@@ -12,6 +12,7 @@ import { pb } from "../lib/pocketbase";
 import { Button, Card, Dialog, Input, Label, Select, SelectItem } from "../components/ui";
 import SwipeCardDeck from "../components/SwipeCardDeck";
 import { recycleBin } from "../lib/recycle-bin";
+import { formatDate, formatIDR, maskAccountNumber } from "../lib/utils";
 import type { BankAccount } from "../types";
 
 type AccountForm = {
@@ -34,40 +35,8 @@ const emptyForm: AccountForm = {
   notes: "",
 };
 
-function formatIDR(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
-function maskAccountNumber(value?: string) {
-  if (!value) return "No account number";
-
-  const clean = value.replace(/\s+/g, "");
-
-  if (clean.length <= 4) {
-    return `•••• ${clean}`;
-  }
-
-  return `•••• ${clean.slice(-4)}`;
-}
-
 function formatUpdatedDate(value?: string) {
-  if (!value) return "Not updated";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Not updated";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return formatDate(value);
 }
 
 function getInitials(name: string) {

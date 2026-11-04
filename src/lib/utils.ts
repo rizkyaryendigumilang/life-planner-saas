@@ -9,6 +9,15 @@ export function formatIDR(value: number | string | null | undefined) {
   }).format(Number.isFinite(numeric) ? numeric : 0);
 }
 
+export const formatCurrency = formatIDR;
+
+export function maskAccountNumber(value?: string | null) {
+  if (!value) return "";
+  const clean = value.replace(/\s+/g, "");
+  if (clean.length <= 4) return clean;
+  return `•••• ${clean.slice(-4)}`;
+}
+
 export function formatDate(value?: string | Date | null) {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value.length === 10 ? `${value}T00:00:00` : value);

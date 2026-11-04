@@ -18,8 +18,9 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { Button } from "../components/ui";
+import { Badge, Button, Card, Dialog } from "../components/ui";
 import { pb } from "../lib/pocketbase";
+import { formatCurrency, formatDate } from "../lib/utils";
 
 import {
   AddExperienceDialog,
@@ -81,24 +82,6 @@ const tabs: Array<"All" | ExperienceType> = [
   "Gaming",
   "Other",
 ];
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatDate(value: string) {
-  if (!value) return "";
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${value}T00:00:00`));
-}
 
 function getTypeIcon(type: ExperienceType) {
   switch (type) {
@@ -1023,44 +1006,24 @@ function ExperienceDetail({
     experience.estimatedCost - spent;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4 backdrop-blur-[2px]"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line/15 bg-surface shadow-xl">
-        {/* Detail Header */}
-        <div className="flex items-start justify-between border-b border-line/10 px-6 py-5">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-muted text-ink-soft">
-                {getTypeIcon(experience.type)}
-              </div>
-
-              <span className="text-xs text-ink-faint">
-                {experience.type}
-              </span>
-            </div>
-
-            <h2 className="mt-4 text-xl font-semibold tracking-tight text-ink">
-              {experience.name}
-            </h2>
+    <Dialog
+      open={Boolean(experience)}
+      onOpenChange={(v) => !v && onClose()}
+      title={
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-ink-soft">
+            {getTypeIcon(experience.type)}
           </div>
-
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft hover:bg-muted"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div>
+            <p className="text-base font-semibold text-ink">{experience.name}</p>
+            <p className="text-xs text-ink-faint">{experience.type}</p>
+          </div>
         </div>
-
-        <div className="space-y-6 p-6">
-          {/* Experience Information */}
+      }
+      className="max-w-2xl max-h-[90vh] overflow-y-auto"
+    >
+      <div className="space-y-6 pt-1">
+        {/* Experience Information */}
           <div className="grid gap-4 sm:grid-cols-2">
             <DetailItem
               label={
@@ -1376,10 +1339,9 @@ function ExperienceDetail({
             </>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
+      </Dialog>
+    );
+  }
 
 function DetailItem({
   label,

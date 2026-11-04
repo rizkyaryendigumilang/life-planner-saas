@@ -16,10 +16,6 @@ import { Badge, Button, Card, Skeleton } from "./ui";
 
 const HIDE_KEY = "life-planner:overview:portfolio-hidden";
 
-function money(value: number) {
-  return formatIDR(value);
-}
-
 export function PortfolioOverviewCard() {
   const [items, setItems] = useState<Investment[]>([]);
   const [quotes, setQuotes] = useState<Map<string, MarketQuote>>(
@@ -205,7 +201,7 @@ export function PortfolioOverviewCard() {
             <Skeleton className="mt-2 h-6 w-28" />
           ) : (
             <p className="mt-1 text-lg font-semibold">
-              {money(totals.invested)}
+              {formatIDR(totals.invested)}
             </p>
           )}
         </div>
@@ -220,7 +216,7 @@ export function PortfolioOverviewCard() {
           ) : (
             <p className="mt-1 text-lg font-semibold">
               {totals.hasCurrent
-                ? money(totals.current)
+                ? formatIDR(totals.current)
                 : "—"}
             </p>
           )}
@@ -259,7 +255,7 @@ export function PortfolioOverviewCard() {
                 }
               >
                 {totals.hasCurrent
-                  ? money(
+                  ? formatIDR(
                       totals.current -
                         totals.invested,
                     )
@@ -337,7 +333,7 @@ export function PortfolioOverviewCard() {
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold">
                     {quote?.price != null
-                      ? money(quote.price)
+                      ? formatIDR(quote.price)
                       : "—"}
                   </p>
 
@@ -351,7 +347,7 @@ export function PortfolioOverviewCard() {
                     }
                   >
                     {pnl != null
-                      ? `${pnl >= 0 ? "+" : ""}${money(pnl)}`
+                      ? `${pnl >= 0 ? "+" : ""}${formatIDR(pnl)}`
                       : "Unavailable"}
                   </p>
                 </div>
