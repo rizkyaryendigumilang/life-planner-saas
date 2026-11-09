@@ -210,7 +210,7 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
       const identity = trimmed.includes("@") ? trimmed.toLowerCase() : trimmed;
       const result = await pb.collection("users").authWithPassword(identity, password);
       if (!validateActiveUser(result.record)) return;
-      toast.success("Signed in. Welcome back!");
+      toast.success("Signed in successfully.");
       onAuthenticated();
     } catch (error) { toast.error(friendlyError(error)); }
     finally { setBusy(false); }
@@ -236,7 +236,7 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
 
       const result = await pb.collection("users").authWithPassword(clean, password);
       if (!validateActiveUser(result.record)) return;
-      toast.success("Account created. Welcome to Life Planner!");
+      toast.success("Account created successfully.");
       onAuthenticated();
     } catch (error) { toast.error(friendlyError(error)); }
     finally { setBusy(false); }
@@ -423,7 +423,7 @@ export function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
           <>
             <AuthCard>
               <h1 className="text-center text-[26px] font-semibold tracking-[-.03em] text-ink">Sign-in</h1>
-              <p className="mt-1.5 text-center text-sm leading-6 text-ink-soft">Welcome back to your workspace.</p>
+              <p className="mt-1.5 text-center text-sm leading-6 text-ink-soft">Enter your credentials to continue.</p>
 
               <form onSubmit={submitLogin} className="mt-7 space-y-4">
                 <div>

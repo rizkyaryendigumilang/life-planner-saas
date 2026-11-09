@@ -163,7 +163,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     <div className="min-h-screen bg-canvas text-ink">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[262px] flex-col border-r border-line/10 bg-surface px-3 py-5 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] transition-transform duration-200 lg:translate-x-0 lg:pt-5 lg:pb-5 lg:pl-3 overscroll-contain",
+          "fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-line/10 bg-surface px-3 py-5 pt-[calc(1.25rem+env(safe-area-inset-top,0px))] pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pl-[calc(0.75rem+env(safe-area-inset-left,0px))] transition-transform duration-200 lg:translate-x-0 lg:pt-5 lg:pb-5 lg:pl-3 overscroll-contain",
           open ? "translate-x-0 shadow-pop" : "-translate-x-full",
         )}
       >
@@ -360,7 +360,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
                 }
               }}
               className={cn(
-                "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-center transition-all duration-150 active:scale-95 touch-manipulation min-h-[48px]",
+                "relative flex flex-1 flex-col items-center justify-center gap-0.5 py-1 text-center transition-colors duration-150 active:scale-95 touch-manipulation min-h-[48px]",
                 isSelected ? "text-ink font-semibold" : "text-ink-faint hover:text-ink-soft",
               )}
             >

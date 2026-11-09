@@ -953,7 +953,7 @@ export function Admin() {
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint"
               />
               <Input
-                placeholder="Cari nama, email, username..."
+                placeholder="Cari nama, email, username"
                 className="pl-9"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

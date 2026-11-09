@@ -444,7 +444,7 @@ export function Calendar() {
 
           <div className="grid grid-cols-7 border-b border-line/10 bg-muted/40">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="px-2 py-2 text-center text-[11px] font-medium uppercase tracking-[.08em] text-ink-faint">
+              <div key={day} className="px-2 py-2 text-center text-[11px] font-medium text-ink-faint">
                 {day}
               </div>
             ))}

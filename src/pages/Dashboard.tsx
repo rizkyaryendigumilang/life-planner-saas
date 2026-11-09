@@ -644,7 +644,7 @@ export function Dashboard({
                     navigator.vibrate(8);
                   }
                 }}
-                className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                className={`relative whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                   isSelected
                     ? "bg-accent text-accent-ink font-semibold shadow-xs"
                     : "text-ink-soft hover:text-ink hover:bg-surface/50"
@@ -780,7 +780,7 @@ export function Dashboard({
                         onClick={() => setHoveredBar(item)}
                       >
                         {/* Interactive floating tooltip on hover */}
-                        <div className="pointer-events-none absolute -top-12 z-20 hidden flex-col items-center group-hover:flex transition-all duration-150 animate-in fade-in zoom-in-95">
+                        <div className="pointer-events-none absolute -top-12 z-20 hidden flex-col items-center group-hover:flex transition-[opacity,transform] duration-150 animate-in fade-in zoom-in-95">
                           <div className="rounded-lg bg-surface-elevated/95 dark:bg-muted px-2.5 py-1 text-center shadow-lg border border-line/15 backdrop-blur-md">
                             <p className="text-[10px] font-medium text-ink-soft whitespace-nowrap">
                               {formatDate(item.date)}

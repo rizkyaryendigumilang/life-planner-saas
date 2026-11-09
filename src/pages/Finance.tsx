@@ -1051,7 +1051,7 @@ export function Finance() {
                   event.target.value,
                 )
               }
-              placeholder="Search transactions..."
+              placeholder="Search transactions"
               className="pl-9"
             />
           </div>

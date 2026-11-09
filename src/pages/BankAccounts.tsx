@@ -427,7 +427,7 @@ export function BankAccounts() {
               onChange={(event) =>
                 updateForm("bank_name", event.target.value)
               }
-              placeholder="BCA, Mandiri, GoPay, Cash..."
+              placeholder="BCA, Mandiri, GoPay, Cash"
             />
           </div>
 

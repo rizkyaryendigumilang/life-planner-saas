@@ -205,7 +205,7 @@ export function BudgetOverviewCard({
               return (
                 <div
                   key={item.category}
-                  className={`rounded-xl border p-3.5 transition-all ${
+                  className={`rounded-xl border p-3.5 transition-colors ${
                     isOver
                       ? "border-rose-500/30 bg-rose-500/5 shadow-xs"
                       : "border-line/15 bg-surface hover:border-line/25"

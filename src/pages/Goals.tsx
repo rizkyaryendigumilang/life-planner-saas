@@ -1258,7 +1258,7 @@ function GoalDialog({
             className="min-h-20 w-full rounded-lg border border-line/15 bg-surface px-3 py-2 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/40"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Additional notes..."
+            placeholder="Additional notes"
           />
         </div>
 

@@ -102,7 +102,7 @@ export function ManageBudgetsDialog({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari kategori..."
+              placeholder="Cari kategori"
               className="pl-9 text-xs"
             />
           </div>
@@ -123,7 +123,7 @@ export function ManageBudgetsDialog({
             return (
               <div
                 key={cat}
-                className={`rounded-xl border p-3.5 transition-all ${
+                className={`rounded-xl border p-3.5 transition-colors ${
                   hasBudget
                     ? "border-line/25 bg-surface shadow-xs"
                     : "border-line/10 bg-muted/20 hover:border-line/20"
