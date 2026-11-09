@@ -164,7 +164,8 @@
 }
 .dialog-backdrop {
   background: rgb(9 9 11 / 0.45);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
 .dialog-scroll {
   max-height: min(88dvh, 88vh, 900px);

@@ -164,15 +164,16 @@ function SwipeableCard({
       drag={isActive && total > 1 ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.35} // Resistensi elastis kenyal
-      whileTap={isActive && total > 1 ? { cursor: "grabbing" } : undefined}
+      whileTap={isActive && total > 1 ? { scale: 0.985, cursor: "grabbing" } : undefined}
       onClick={() => {
         if (isActive && onClick) onClick(item);
       }}
       onDragEnd={(_, info) => {
         if (total <= 1) return;
-        // Trigger swipe jika jarak geser > 60px ATAU kecepatan flick > 300px/s
+        // Apple WWDC momentum projection (deceleration rate 0.996)
+        const projectedX = info.offset.x + (info.velocity.x / 1000) * (0.996 / (1 - 0.996));
         const isFlick = Math.abs(info.velocity.x) > 300;
-        const isPassedThreshold = Math.abs(info.offset.x) > 60;
+        const isPassedThreshold = Math.abs(info.offset.x) > 60 || Math.abs(projectedX) > 130;
         if (isFlick || isPassedThreshold) {
           if (typeof navigator !== "undefined" && navigator.vibrate) {
             try {
