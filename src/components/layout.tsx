@@ -353,6 +353,13 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
               aria-current={isSelected && !isMore ? "page" : undefined}
               aria-label={tab.label}
               onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                  try {
+                    navigator.vibrate(8);
+                  } catch {
+                    // ignore
+                  }
+                }
                 if (isMore) {
                   setOpen((prev) => !prev);
                 } else {

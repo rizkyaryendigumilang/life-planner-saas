@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import { AnimatePresence, motion, useDragControls } from "framer-motion";
 
 function cx(...parts: Array<string | undefined | false | null>) {
   return parts.filter(Boolean).join(" ");
@@ -28,7 +29,7 @@ export function Button({ className, variant = "primary", size = "md", type = "bu
     <button
       type={type}
       className={cx(
-        "inline-flex items-center justify-center font-medium select-none transition duration-150 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center font-medium select-none transition-[transform,background-color,border-color,color,opacity] duration-100 ease-out disabled:pointer-events-none disabled:opacity-50 touch-manipulation",
         variants[variant],
         sizes[size],
         className,
@@ -39,7 +40,15 @@ export function Button({ className, variant = "primary", size = "md", type = "bu
 }
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("rounded-xl border border-line/12 bg-surface shadow-xs transition-colors", className)} {...props} />;
+  return (
+    <div
+      className={cx(
+        "relative rounded-xl border border-line/12 bg-surface shadow-xs transition-colors before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:rounded-t-xl before:bg-gradient-to-r before:from-transparent before:via-line/20 before:to-transparent",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
@@ -318,80 +327,90 @@ export function Select({
 
       {name && <input type="hidden" name={name} value={current} />}
 
-      {open &&
-        panel &&
-        typeof document !== "undefined" &&
+      {typeof document !== "undefined" &&
         createPortal(
-          <div
-            ref={panelRef}
-            role="listbox"
-            tabIndex={-1}
-            onKeyDown={onPanelKeyDown}
-            style={{ left: panel.left, top: panel.top, bottom: panel.bottom, width: panel.width, maxHeight: panel.maxHeight }}
-            className={cx(
-              "fixed z-[200] flex flex-col overflow-hidden rounded-xl border border-line/15 bg-surface p-1.5 shadow-pop outline-none transition duration-150 ease-out animate-in fade-in-0 zoom-in-95",
-              panel.bottom !== undefined ? "origin-bottom" : "origin-top",
-            )}
-          >
-            {searchable && (
-              <div className="relative mb-1">
-                <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
-                <input
-                  ref={searchRef}
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setActive(0);
-                  }}
-                  placeholder="Search"
-                  aria-label="Search options"
-                  className="h-8 w-full rounded-lg border border-line/15 bg-canvas pl-8 pr-7 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/35"
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      setActive(0);
-                      searchRef.current?.focus();
-                    }}
-                    aria-label="Clear search"
-                    className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded text-ink-faint transition hover:text-ink"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {filtered.length === 0 && <p className="px-2.5 py-3 text-xs text-ink-faint">No options found.</p>}
-              {filtered.map((option, index) => {
-                const isSelected = option.value === current;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    data-option={index}
-                    aria-selected={isSelected}
-                    disabled={option.disabled}
-                    onMouseEnter={() => setActive(index)}
-                    onClick={() => commit(option.value)}
-                    className={cx(
-                      "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition disabled:pointer-events-none disabled:opacity-40",
-                      index === active ? "bg-line/[.07] text-ink" : "text-ink-soft",
-                      isSelected && "font-medium text-ink",
+          <AnimatePresence>
+            {open && panel && (
+              <motion.div
+                ref={panelRef}
+                role="listbox"
+                tabIndex={-1}
+                onKeyDown={onPanelKeyDown}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", damping: 26, stiffness: 420 }}
+                style={{
+                  left: panel.left,
+                  top: panel.top,
+                  bottom: panel.bottom,
+                  width: panel.width,
+                  maxHeight: panel.maxHeight,
+                  transformOrigin: panel.bottom !== undefined ? "bottom center" : "top center",
+                }}
+                className="fixed z-[200] flex flex-col overflow-hidden rounded-xl border border-line/15 bg-surface p-1.5 shadow-pop outline-none"
+              >
+                {searchable && (
+                  <div className="relative mb-1">
+                    <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+                    <input
+                      ref={searchRef}
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setActive(0);
+                      }}
+                      placeholder="Search"
+                      aria-label="Search options"
+                      className="h-8 w-full rounded-lg border border-line/15 bg-canvas pl-8 pr-7 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint focus:border-ink/35"
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuery("");
+                          setActive(0);
+                          searchRef.current?.focus();
+                        }}
+                        aria-label="Clear search"
+                        className="absolute right-2 top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded text-ink-faint transition hover:text-ink"
+                      >
+                        <X size={12} />
+                      </button>
                     )}
-                  >
-                    {option.icon && <span className="grid h-4 w-4 shrink-0 place-items-center text-ink-faint">{option.icon}</span>}
-                    <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                    {isSelected && <Check size={15} className="shrink-0 text-ink" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>,
+                  </div>
+                )}
+
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {filtered.length === 0 && <p className="px-2.5 py-3 text-xs text-ink-faint">No options found.</p>}
+                  {filtered.map((option, index) => {
+                    const isSelected = option.value === current;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="option"
+                        data-option={index}
+                        aria-selected={isSelected}
+                        disabled={option.disabled}
+                        onMouseEnter={() => setActive(index)}
+                        onClick={() => commit(option.value)}
+                        className={cx(
+                          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition disabled:pointer-events-none disabled:opacity-40",
+                          index === active ? "bg-line/[.07] text-ink" : "text-ink-soft",
+                          isSelected && "font-medium text-ink",
+                        )}
+                      >
+                        {option.icon && <span className="grid h-4 w-4 shrink-0 place-items-center text-ink-faint">{option.icon}</span>}
+                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                        {isSelected && <Check size={15} className="shrink-0 text-ink" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
           document.body,
         )}
     </>
@@ -452,6 +471,22 @@ export function Dialog({
 }) {
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const dragControls = useDragControls();
+
+  const [isDesktop, setIsDesktop] = useState(() => {
+    return typeof window !== "undefined" ? window.matchMedia("(min-width: 640px)").matches : true;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(min-width: 640px)");
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  const shouldReduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -466,7 +501,7 @@ export function Dialog({
       if (isFinePointer) {
         dialogRef.current?.querySelector<HTMLElement>("input,button,select,textarea")?.focus();
       }
-    }, 20);
+    }, 40);
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = oldOverflow;
@@ -474,44 +509,114 @@ export function Dialog({
       previous?.focus?.();
     };
   }, [open, onOpenChange]);
-  if (!open || typeof document === "undefined") return null;
+
+  if (typeof document === "undefined") return null;
+
   return createPortal(
-    <div
-      className="dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onOpenChange(false);
-      }}
-    >
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={description ? `${titleId}-desc` : undefined}
-        className={cx(
-          "dialog-scroll w-full max-w-xl rounded-t-2xl border border-line/15 bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-pop sm:rounded-xl sm:p-6",
-          className,
-        )}
-      >
-        <div className="mb-5 flex items-start justify-between gap-4 border-b border-line/10 pb-4">
-          <div>
-            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">
-              {title}
-            </h2>
-            {description && <p id={`${titleId}-desc`} className="mt-1 text-sm text-ink-soft">{description}</p>}
-          </div>
-          <button
-            type="button"
-            aria-label="Close dialog"
-            onClick={() => onOpenChange(false)}
-            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-line/[.06] hover:text-ink before:absolute before:-inset-1.5 before:content-['']"
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="dialog-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onOpenChange(false);
+          }}
+        >
+          <motion.div
+            key="dialog-content"
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={description ? `${titleId}-desc` : undefined}
+            initial={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : isDesktop
+                ? { opacity: 0, scale: 0.96, y: 14 }
+                : { opacity: 0, y: "100%" }
+            }
+            animate={
+              shouldReduceMotion
+                ? { opacity: 1 }
+                : isDesktop
+                ? { opacity: 1, scale: 1, y: 0 }
+                : { opacity: 1, y: 0 }
+            }
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : isDesktop
+                ? { opacity: 0, scale: 0.96, y: 10 }
+                : { opacity: 0, y: "100%" }
+            }
+            transition={
+              shouldReduceMotion
+                ? { duration: 0.15 }
+                : isDesktop
+                ? { type: "spring", damping: 28, stiffness: 380, mass: 0.8 }
+                : { type: "spring", damping: 32, stiffness: 360, mass: 0.8 }
+            }
+            drag={isDesktop ? false : "y"}
+            dragListener={false}
+            dragControls={dragControls}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.04, bottom: 0.4 }}
+            onDragEnd={(_, info) => {
+              if (isDesktop) return;
+              // Apple WWDC 2018 momentum projection (deceleration rate 0.996)
+              const projectedY = info.offset.y + (info.velocity.y / 1000) * (0.996 / (1 - 0.996));
+              const isFlick = info.velocity.y > 380;
+              const isPassedThreshold = info.offset.y > 80 || projectedY > 160;
+              if (isFlick || isPassedThreshold) {
+                if (typeof navigator !== "undefined" && navigator.vibrate) {
+                  try {
+                    navigator.vibrate(10);
+                  } catch {
+                    // ignore
+                  }
+                }
+                onOpenChange(false);
+              }
+            }}
+            className={cx(
+              "dialog-scroll relative w-full max-w-xl rounded-t-2xl border border-line/15 bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] shadow-pop before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:rounded-t-2xl before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent sm:rounded-xl sm:p-6 sm:before:rounded-t-xl",
+              className,
+            )}
           >
-            <X size={17} aria-hidden="true" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
+            {/* iOS Grab Handle for Mobile Bottom Sheet */}
+            <div
+              className="flex w-full items-center justify-center pt-0 pb-3 sm:hidden cursor-grab active:cursor-grabbing touch-none select-none"
+              onPointerDown={(e) => dragControls.start(e)}
+            >
+              <div className="h-1.5 w-10 rounded-full bg-line/25" />
+            </div>
+
+            <div className="mb-5 flex items-start justify-between gap-4 border-b border-line/10 pb-4">
+              <div>
+                <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">
+                  {title}
+                </h2>
+                {description && <p id={`${titleId}-desc`} className="mt-1 text-sm text-ink-soft">{description}</p>}
+              </div>
+              <button
+                type="button"
+                aria-label="Close dialog"
+                onClick={() => onOpenChange(false)}
+                className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-line/[.06] hover:text-ink active:scale-95 before:absolute before:-inset-1.5 before:content-['']"
+              >
+                <X size={17} aria-hidden="true" />
+              </button>
+            </div>
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }
