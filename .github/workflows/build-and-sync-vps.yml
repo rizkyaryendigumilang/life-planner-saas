@@ -23,10 +23,11 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'README.md'
-      - '.gitignore'
-      - '.github/workflows/ci-cd-web-vps.yml'
+    paths:
+      - 'android/**'
+      - 'ios/**'
+      - 'capacitor.config.*'
+      - '.github/workflows/build-and-sync-vps.yml'
 
 jobs:
   # ==========================================
@@ -127,28 +128,36 @@ jobs:
             STRICT_OPT="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           fi
 
+          echo "Menguji konektivitas SSH ke VPS ($VPS_HOST:$TARGET_PORT)..."
+          if ! ssh -o BatchMode=yes -o ConnectTimeout=10 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "echo SSH_CONNECTION_OK" 2>/dev/null; then
+            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak firewall. File APK tetap aman tersimpan di GitHub Artifacts."
+            rm -f "$HOME/.ssh/id_ed25519"
+            exit 0
+          fi
+
           # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
           ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
-            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
+            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')" || true
 
           # 2. Upload APK via SCP
           echo "Mentransfer app-latest.apk ke VPS..."
-          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"
-
-          # 3. Pastikan izin akses file agar dapat diunduh melalui web server (Caddy/Nginx)
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
-            "chmod 644 '$VPS_TARGET/app-latest.apk'"
+          if scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"; then
+            ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+              "chmod 644 '$VPS_TARGET/app-latest.apk'" || true
+            echo "✓ Android APK berhasil ditransfer ke $VPS_TARGET/app-latest.apk"
+          else
+            echo "::warning::Transfer SCP APK ke VPS gagal. File APK tetap aman tersimpan di GitHub Artifacts."
+          fi
 
           rm -f "$HOME/.ssh/id_ed25519"
-          echo "✓ Android APK berhasil ditransfer ke $VPS_TARGET/app-latest.apk"
 
   # ==========================================
   # 2. BUILD IOS (.IPA) - RUN ON MACOS CLOUD
   # ==========================================
   build-ios:
     name: Build iOS IPA
-    runs-on: macos-14
+    runs-on: macos-latest
     continue-on-error: true
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -261,18 +270,26 @@ jobs:
             chmod 600 "$HOME/.ssh/known_hosts"
             STRICT_OPT="-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
           fi
+          echo "Menguji konektivitas SSH ke VPS ($VPS_HOST:$TARGET_PORT)..."
+          if ! ssh -o BatchMode=yes -o ConnectTimeout=10 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "echo SSH_CONNECTION_OK" 2>/dev/null; then
+            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak oleh firewall. File IPA tetap aman tersimpan di GitHub Artifacts."
+            rm -f "$HOME/.ssh/id_ed25519"
+            exit 0
+          fi
+
           # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
           ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
-            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')"
+            "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')" || true
 
           # 2. Upload IPA via SCP
           echo "Mentransfer app-latest.ipa ke VPS..."
-          scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"
-
-          # 3. Pastikan izin akses file agar dapat diunduh melalui web server
-          ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
-            "chmod 644 '$VPS_TARGET/app-latest.ipa'"
+          if scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"; then
+            ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
+              "chmod 644 '$VPS_TARGET/app-latest.ipa'" || true
+            echo "✓ iOS IPA berhasil ditransfer ke $VPS_TARGET/app-latest.ipa"
+          else
+            echo "::warning::Transfer SCP IPA ke VPS gagal. File IPA tetap aman tersimpan di GitHub Artifacts."
+          fi
 
           rm -f "$HOME/.ssh/id_ed25519"
-          echo "✓ iOS IPA berhasil ditransfer ke $VPS_TARGET/app-latest.ipa"
