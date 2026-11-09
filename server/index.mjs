@@ -537,8 +537,11 @@ async function processExpenseIngestion(ingestion) {
 
 app.get("/api/health", async (_req, res) => {
   res.json({
+    success: true,
     status: "ok",
     service: "life-planner-saas-api",
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
     pocketbase: PB_URL,
   });
 });

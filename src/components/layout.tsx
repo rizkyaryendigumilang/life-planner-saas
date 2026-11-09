@@ -101,8 +101,8 @@ function ThemeToggle() {
   );
 }
 
-export function AppShell({ page, onPage, role, onLogout, children }: {
-  page: Page; onPage: (p: Page) => void; role: Role; onLogout: () => void; children: ReactNode;
+export function AppShell({ page, onPage, role, onLogout, onOpenCommandPalette, children }: {
+  page: Page; onPage: (p: Page) => void; role: Role; onLogout: () => void; onOpenCommandPalette?: () => void; children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -126,7 +126,11 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     const onShortcut = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        searchRef.current?.focus();
+        if (onOpenCommandPalette) {
+          onOpenCommandPalette();
+        } else {
+          searchRef.current?.focus();
+        }
       }
       if (event.key === "Escape" && document.activeElement === searchRef.current) {
         setSearchTerm("");
@@ -135,7 +139,7 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
     };
     window.addEventListener("keydown", onShortcut);
     return () => window.removeEventListener("keydown", onShortcut);
-  }, []);
+  }, [onOpenCommandPalette]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -176,19 +180,31 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
           </Button>
         </div>
 
-        <div className="relative mb-4 px-1">
+        <div
+          className="relative mb-4 px-1 cursor-pointer"
+          onClick={() => {
+            if (onOpenCommandPalette) onOpenCommandPalette();
+          }}
+        >
           <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint" />
           <input
             ref={searchRef}
-            value={searchTerm}
+            readOnly={!!onOpenCommandPalette}
+            value={onOpenCommandPalette ? "" : searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             onKeyDown={handleSearchKeyDown}
-            aria-label="Search pages and navigate"
-            placeholder="Search pages"
-            className="h-9 w-full rounded-lg border border-line/15 bg-transparent pl-9 pr-12 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/35 focus:ring-4 focus:ring-ink/[.05]"
+            onFocus={() => {
+              if (onOpenCommandPalette) {
+                searchRef.current?.blur();
+                onOpenCommandPalette();
+              }
+            }}
+            aria-label="Cari fitur dan halaman (Ctrl K)"
+            placeholder="Cari atau Ctrl K..."
+            className="h-9 w-full cursor-pointer rounded-lg border border-line/15 bg-transparent pl-9 pr-12 text-base sm:text-xs text-ink outline-none transition placeholder:text-ink-faint hover:border-line/20 focus:border-ink/35 focus:ring-4 focus:ring-ink/[.05]"
           />
           <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-line/15 px-1.5 py-0.5 text-[9px] font-medium text-ink-faint sm:block">Ctrl K</kbd>
-          {searchTerm.trim() && (
+          {!onOpenCommandPalette && searchTerm.trim() && (
             <div className="absolute left-1 right-1 top-11 z-10 max-h-64 overflow-y-auto rounded-lg border border-line/15 bg-surface p-1.5 shadow-pop">
               {visibleQuickPages.length ? (
                 visibleQuickPages.map((item) => (
@@ -312,6 +328,18 @@ export function AppShell({ page, onPage, role, onLogout, children }: {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {onOpenCommandPalette && (
+              <button
+                type="button"
+                onClick={onOpenCommandPalette}
+                aria-label="Buka Command Palette"
+                className="hidden sm:inline-flex items-center gap-2 rounded-lg border border-line/15 bg-surface/70 px-2.5 py-1 text-xs text-ink-faint hover:border-line/25 hover:text-ink transition active:scale-95"
+              >
+                <Search size={13} />
+                <span>Cari</span>
+                <kbd className="rounded border border-line/15 bg-canvas px-1 text-[10px]">Ctrl K</kbd>
+              </button>
+            )}
             <button
               onClick={() => navigate("settings")}
               className="flex items-center gap-2.5 rounded-lg p-1 pr-2 transition hover:bg-line/[.05]"

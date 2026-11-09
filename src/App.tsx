@@ -6,6 +6,8 @@ import { useCapacitor } from "./hooks/use-capacitor";
 import { Login } from "./pages/Login";
 import { AppShell, type Page } from "./components/layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { CommandPalette } from "./components/CommandPalette";
+import { OfflineBanner } from "./components/OfflineBanner";
 import { Toaster, toast } from "sonner";
 
 // Lazy-loaded pages for optimal bundle size & fast startup
@@ -40,8 +42,9 @@ function PageFallback() {
 
 function Workspace() {
   const auth = useAuth();
-  const { resolved } = useTheme();
+  const { resolved, toggle: toggleTheme } = useTheme();
   const [page, setPage] = useState<Page>("overview");
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   useCapacitor({
     page,
@@ -96,6 +99,7 @@ function Workspace() {
       page={page}
       onPage={setPage}
       role={auth.role}
+      onOpenCommandPalette={() => setCommandPaletteOpen(true)}
       onLogout={() => {
         pb.authStore.clear();
         toast.success("Kamu sudah keluar dengan aman.");
@@ -106,6 +110,14 @@ function Workspace() {
           {content}
         </Suspense>
       </ErrorBoundary>
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        onNavigate={setPage}
+        onToggleTheme={toggleTheme}
+        role={auth.role}
+      />
+      <OfflineBanner />
       {toaster}
     </AppShell>
   );

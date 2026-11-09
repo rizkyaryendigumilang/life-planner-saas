@@ -63,6 +63,16 @@ export function BankAccounts() {
   const [form, setForm] = useState<AccountForm>(emptyForm);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
 
+  useEffect(() => {
+    const onAdd = () => {
+      setEditingAccount(null);
+      setForm(emptyForm);
+      setDialogOpen(true);
+    };
+    window.addEventListener("life-planner:open-add-account", onAdd);
+    return () => window.removeEventListener("life-planner:open-add-account", onAdd);
+  }, []);
+
   const userId = pb.authStore.record?.id;
 
   const loadAccounts = async () => {

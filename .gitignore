@@ -5,6 +5,7 @@ dist
 .runtime/
 .DS_Store
 *.log
+*.tsbuildinfo
 pocketbase/pb_data/
 
 # Showcase & Remotion Scratch Assets

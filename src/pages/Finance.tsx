@@ -141,8 +141,19 @@ export function Finance() {
       const detail = (e as CustomEvent<CategoryBudgets>).detail;
       if (detail) setBudgets(detail);
     };
+    const onAdd = () => {
+      setEditingTransaction(null);
+      setOpen(true);
+    };
+    const onScan = () => setScanOpen(true);
     window.addEventListener("life-planner:budgets-updated", handleBudgetsUpdated);
-    return () => window.removeEventListener("life-planner:budgets-updated", handleBudgetsUpdated);
+    window.addEventListener("life-planner:open-add-transaction", onAdd);
+    window.addEventListener("life-planner:open-scan-bill", onScan);
+    return () => {
+      window.removeEventListener("life-planner:budgets-updated", handleBudgetsUpdated);
+      window.removeEventListener("life-planner:open-add-transaction", onAdd);
+      window.removeEventListener("life-planner:open-scan-bill", onScan);
+    };
   }, []);
 
   const categorySpending = useMemo(() => {
