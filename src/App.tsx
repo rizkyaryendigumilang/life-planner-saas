@@ -14,6 +14,7 @@ import { Toaster, toast } from "sonner";
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })));
 const Planner = lazy(() => import("./pages/Planner").then((m) => ({ default: m.Planner })));
 const Finance = lazy(() => import("./pages/Finance").then((m) => ({ default: m.Finance })));
+const HouseholdExpenses = lazy(() => import("./pages/HouseholdExpenses").then((m) => ({ default: m.HouseholdExpenses })));
 const Entertainment = lazy(() => import("./pages/Entertainment").then((m) => ({ default: m.Entertainment })));
 const Travel = lazy(() => import("./pages/Travel").then((m) => ({ default: m.Travel })));
 const Admin = lazy(() => import("./pages/Admin").then((m) => ({ default: m.Admin })));
@@ -76,6 +77,7 @@ function Workspace() {
       case "planner": return <Planner />;
       case "entertainment": return <Entertainment />;
       case "finance": return <Finance />;
+      case "household": return <HouseholdExpenses />;
       case "bank-accounts": return <BankAccounts />;
       case "pets": return <Pets />;
       case "travel": return <Travel />;

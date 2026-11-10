@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity, CalendarDays, CheckSquare, CircleDollarSign, CreditCard, Download, Eye,
-  LogOut, Menu, Monitor, Moon, PawPrint, Plane, Search, Settings2, Shield,
+  Home, LogOut, Menu, Monitor, Moon, PawPrint, Plane, Search, Settings2, Shield,
   Smartphone, Sun, Target, Ticket, X, WalletCards,
 } from "lucide-react";
 import { Button } from "./ui";
@@ -12,7 +12,7 @@ import { usePwa } from "../hooks/use-pwa";
 import type { Role } from "../types";
 import { BrandLogo } from "./BrandLogo";
 
-export type Page = "overview" | "planner" | "finance" | "bank-accounts" | "portfolio" | "pets" | "travel" | "goals" | "calendar" | "entertainment" | "device" | "admin" | "settings";
+export type Page = "overview" | "planner" | "finance" | "household" | "bank-accounts" | "portfolio" | "pets" | "travel" | "goals" | "calendar" | "entertainment" | "device" | "admin" | "settings";
 
 const navGroups = [
   {
@@ -27,6 +27,7 @@ const navGroups = [
     title: "Your life",
     items: [
       { id: "finance", label: "Expense Tracking", icon: CircleDollarSign },
+      { id: "household", label: "Household", icon: Home },
       { id: "bank-accounts", label: "Accounts", icon: CreditCard },
       { id: "portfolio", label: "Portfolio", icon: WalletCards },
       { id: "goals", label: "Goals", icon: Target },
@@ -47,6 +48,7 @@ const pageMeta: Record<Page, string> = {
   overview: "Overview",
   planner: "Life Planner",
   finance: "Expense Tracking",
+  household: "Household Expenses",
   "bank-accounts": "Accounts",
   portfolio: "Portfolio",
   pets: "Pet Management",

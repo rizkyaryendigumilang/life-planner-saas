@@ -36,6 +36,11 @@ import { formatIDR, formatDate, maskAccountNumber } from "../lib/utils";
 import { toast } from "sonner";
 import { recycleBin } from "../lib/recycle-bin";
 import type { BankAccount, Expense } from "../types";
+import {
+  isHouseholdExpense,
+  extractHouseholdSubcategory,
+  cleanHouseholdNotes,
+} from "../lib/household";
 
 type PetOption = {
   id: string;
@@ -120,6 +125,7 @@ export function Finance() {
     useState(true);
 
   const [selectedMonth, setSelectedMonth] = useState("all");
+  const [segment, setSegment] = useState<"all" | "personal" | "household">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [totalItems, setTotalItems] = useState(0);
@@ -359,21 +365,30 @@ export function Finance() {
 
   /*
    * =========================================================
-   * MONTH FILTER
+   * MONTH & SEGMENT FILTER
    * =========================================================
    */
   const filteredItems = useMemo(() => {
-    if (selectedMonth === "all") {
-      return searchedItems;
+    let result = searchedItems;
+
+    if (segment === "personal") {
+      result = result.filter((item) => !isHouseholdExpense(item));
+    } else if (segment === "household") {
+      result = result.filter((item) => isHouseholdExpense(item));
     }
 
-    return searchedItems.filter(
+    if (selectedMonth === "all") {
+      return result;
+    }
+
+    return result.filter(
       (item) =>
         getMonthKey(item.date) ===
         selectedMonth,
     );
   }, [
     searchedItems,
+    segment,
     selectedMonth,
   ]);
 
@@ -604,6 +619,13 @@ export function Finance() {
                     "string" &&
                   data.account
                     ? data.account
+                    : null,
+
+                due_date:
+                  typeof data.due_date ===
+                    "string" &&
+                  data.due_date
+                    ? data.due_date
                     : null,
               },
             );
@@ -1048,29 +1070,88 @@ export function Finance() {
           TRANSACTION TABLE
           ===================================================== */}
       <Card className="mt-4 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-line/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full max-w-sm">
-            <Search
-              size={16}
-              className="absolute left-3 top-3 text-ink-soft"
-            />
+        <div className="flex flex-col gap-3 border-b border-line/10 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative w-full sm:w-64">
+              <Search
+                size={16}
+                className="absolute left-3 top-3 text-ink-soft"
+              />
 
-            <Input
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value,
-                )
-              }
-              placeholder="Search transactions"
-              className="pl-9"
-            />
+              <Input
+                value={search}
+                onChange={(event) =>
+                  setSearch(
+                    event.target.value,
+                  )
+                }
+                placeholder="Search transactions"
+                className="pl-9"
+              />
+            </div>
+
+            {/* SEGMENT FILTER: [ Semua | 👤 Personal | 🏠 Household ] */}
+            <div className="inline-flex items-center gap-1 rounded-xl bg-muted/60 p-1 border border-line/10 shadow-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setSegment("all");
+                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+                }}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  segment === "all"
+                    ? "bg-surface text-ink font-semibold shadow-xs border border-line/10"
+                    : "text-ink-soft hover:text-ink hover:bg-surface/50"
+                }`}
+              >
+                Semua
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSegment("personal");
+                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+                }}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  segment === "personal"
+                    ? "bg-surface text-ink font-semibold shadow-xs border border-line/10"
+                    : "text-ink-soft hover:text-ink hover:bg-surface/50"
+                }`}
+              >
+                👤 Personal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSegment("household");
+                  if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+                }}
+                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  segment === "household"
+                    ? "bg-surface text-ink font-semibold shadow-xs border border-line/10"
+                    : "text-ink-soft hover:text-ink hover:bg-surface/50"
+                }`}
+              >
+                🏠 Household
+              </button>
+            </div>
           </div>
 
-          <span className="text-xs text-ink-soft">
-            {filteredItems.length}{" "}
-            records
-          </span>
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            {segment === "household" && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={() => window.dispatchEvent(new CustomEvent("life-planner:navigate", { detail: "household" }))}
+              >
+                Buka Household Hub
+              </Button>
+            )}
+            <span className="text-xs text-ink-soft">
+              {filteredItems.length} records
+            </span>
+          </div>
         </div>
 
         {/* ===================================================
@@ -1235,8 +1316,14 @@ export function Finance() {
                                     item.date,
                                   )}
                                   {" · "}
-                                  {item.notes ||
-                                    "No note"}
+                                  {isHouseholdExpense(item) ? (
+                                    <>
+                                      <span className="font-medium text-ink">🏠 {extractHouseholdSubcategory(item)}</span>
+                                      {cleanHouseholdNotes(item.notes) ? ` · ${cleanHouseholdNotes(item.notes)}` : ""}
+                                    </>
+                                  ) : (
+                                    item.notes || "No note"
+                                  )}
                                 </p>
 
                                 {account && (
@@ -1507,7 +1594,18 @@ function MonthRows({
             </td>
 
             <td className="px-5 py-4 text-ink-soft">
-              {item.notes || "—"}
+              {isHouseholdExpense(item) ? (
+                <div className="flex flex-col gap-0.5">
+                  <span className="inline-flex items-center gap-1 w-fit rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-ink">
+                    🏠 {extractHouseholdSubcategory(item)}
+                  </span>
+                  {cleanHouseholdNotes(item.notes) && (
+                    <span className="text-xs">{cleanHouseholdNotes(item.notes)}</span>
+                  )}
+                </div>
+              ) : (
+                item.notes || "—"
+              )}
             </td>
 
             <td

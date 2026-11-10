@@ -26,6 +26,7 @@ type ScanBillDialogProps = {
   onSaved?: () => void;
   bankAccounts?: BankAccount[];
   defaultCategory?: string;
+  notePrefix?: string;
 };
 
 export default function ScanBillDialog({
@@ -34,6 +35,7 @@ export default function ScanBillDialog({
   onSaved,
   bankAccounts = [],
   defaultCategory = "Other",
+  notePrefix,
 }: ScanBillDialogProps) {
   const [phase, setPhase] = useState<"pick" | "reading" | "review">("pick");
   const [preview, setPreview] = useState<string | null>(null);
@@ -130,13 +132,14 @@ export default function ScanBillDialog({
 
     setSaving(true);
     try {
+      const finalNotes = [notePrefix, merchant.trim()].filter(Boolean).join(" - ");
       await pb.collection("expenses").create({
         user: userId,
         type: "Expense",
         amount: value,
         category,
         date,
-        notes: merchant.trim() || undefined,
+        notes: finalNotes || undefined,
         account: account || undefined,
       });
 

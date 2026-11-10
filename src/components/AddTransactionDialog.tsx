@@ -9,6 +9,14 @@ import {
 } from "./ui";
 import { toast } from "sonner";
 import { EXPENSE_CATEGORIES } from "../lib/categories";
+import {
+  HOUSEHOLD_SUBCATEGORIES,
+  type HouseholdSubcategory,
+  isHouseholdExpense,
+  extractHouseholdSubcategory,
+  cleanHouseholdNotes,
+  buildHouseholdNotes,
+} from "../lib/household";
 
 type Pet = {
   id: string;
@@ -34,6 +42,7 @@ type Transaction = {
   category?: string | null;
   date?: string | null;
   notes?: string | null;
+  due_date?: string | null;
 };
 
 type TransactionFormData = {
@@ -44,6 +53,7 @@ type TransactionFormData = {
   notes?: string;
   pet?: string;
   account?: string;
+  due_date?: string;
 };
 
 type AddTransactionDialogProps = {
@@ -143,6 +153,15 @@ export default function AddTransactionDialog({
   const [notes, setNotes] =
     useState("");
 
+  const [allocation, setAllocation] =
+    useState<"personal" | "household">("personal");
+
+  const [householdSub, setHouseholdSub] =
+    useState<HouseholdSubcategory>("Listrik PLN");
+
+  const [dueDate, setDueDate] =
+    useState("");
+
   useEffect(() => {
     if (!open) {
       return;
@@ -174,9 +193,18 @@ export default function AddTransactionDialog({
       getInitialDate(transaction),
     );
 
-    setNotes(
-      transaction?.notes || "",
-    );
+    const isHh = transaction ? isHouseholdExpense(transaction) : false;
+    setAllocation(isHh ? "household" : "personal");
+
+    if (isHh && transaction) {
+      setHouseholdSub(extractHouseholdSubcategory(transaction));
+      setNotes(cleanHouseholdNotes(transaction.notes));
+    } else {
+      setHouseholdSub("Listrik PLN");
+      setNotes(transaction?.notes || "");
+    }
+
+    setDueDate(transaction?.due_date ? transaction.due_date.slice(0, 10) : "");
   }, [open, transaction]);
 
   const resetForm = () => {
@@ -185,6 +213,9 @@ export default function AddTransactionDialog({
     setAccount("");
     setPet("");
     setCategory("Food");
+    setAllocation("personal");
+    setHouseholdSub("Listrik PLN");
+    setDueDate("");
 
     setDate(
       new Date()
@@ -235,18 +266,34 @@ export default function AddTransactionDialog({
       return;
     }
 
+    let finalNotes = notes.trim();
+    let finalCategory = category;
+
+    if (allocation === "household") {
+      finalNotes = buildHouseholdNotes(notes, householdSub);
+      if (householdSub === "Belanja Dapur & Pokok") {
+        finalCategory = "Food";
+      } else if (householdSub === "Perawatan & Servis Rumah") {
+        finalCategory = "Other";
+      } else {
+        finalCategory = "Bills";
+      }
+    }
+
     try {
       await onCreate({
         type,
         amount: Number(amount),
-        category,
+        category: finalCategory,
         date,
         notes:
-          notes.trim() || undefined,
+          finalNotes || undefined,
         pet:
           pet || undefined,
         account:
           account || undefined,
+        due_date:
+          dueDate || undefined,
       });
     } catch {
       return;
@@ -264,6 +311,41 @@ export default function AddTransactionDialog({
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
+        {/* ALLOCATION SWITCH (PERSONAL VS HOUSEHOLD) */}
+        <div className="sm:col-span-2">
+          <Label>Alokasi Anggaran</Label>
+          <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-muted/60 p-1 border border-line/10">
+            <button
+              type="button"
+              onClick={() => {
+                setAllocation("personal");
+                if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all ${
+                allocation === "personal"
+                  ? "bg-surface text-ink font-semibold shadow-xs border border-line/10"
+                  : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              👤 Pribadi
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAllocation("household");
+                if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(8);
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-medium transition-all ${
+                allocation === "household"
+                  ? "bg-surface text-ink font-semibold shadow-xs border border-line/10"
+                  : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              🏠 Rumah Tangga
+            </button>
+          </div>
+        </div>
+
         {/* TYPE */}
         <div className="sm:col-span-2">
           <Label>Type</Label>
@@ -322,28 +404,58 @@ export default function AddTransactionDialog({
           )}
         </div>
 
-        {/* CATEGORY */}
-        <div className="sm:col-span-2">
-          <Label>Category</Label>
+        {/* CATEGORY / HOUSEHOLD SUBCATEGORY */}
+        {allocation === "household" ? (
+          <>
+            <div className="sm:col-span-2">
+              <Label>Kebutuhan Rumah Tangga</Label>
+              <Select
+                value={householdSub}
+                onValueChange={(val) => setHouseholdSub(val as HouseholdSubcategory)}
+              >
+                {HOUSEHOLD_SUBCATEGORIES.map((sub) => (
+                  <SelectItem key={sub} value={sub}>
+                    {sub}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
 
-          <Select
-            value={category}
-            onValueChange={
-              handleCategoryChange
-            }
-          >
-            {categories.map(
-              (item) => (
-                <SelectItem
-                  key={item}
-                  value={item}
-                >
-                  {item}
-                </SelectItem>
-              ),
-            )}
-          </Select>
-        </div>
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between">
+                <Label>Jatuh Tempo (Due Date)</Label>
+                <span className="text-[11px] text-ink-faint">Opsional untuk tagihan</span>
+              </div>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="sm:col-span-2">
+            <Label>Category</Label>
+
+            <Select
+              value={category}
+              onValueChange={
+                handleCategoryChange
+              }
+            >
+              {categories.map(
+                (item) => (
+                  <SelectItem
+                    key={item}
+                    value={item}
+                  >
+                    {item}
+                  </SelectItem>
+                ),
+              )}
+            </Select>
+          </div>
+        )}
 
         {/* ACCOUNT */}
         <div className="sm:col-span-2">

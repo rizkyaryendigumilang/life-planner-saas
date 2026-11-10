@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   Command,
   CreditCard,
+  Home,
   PawPrint,
   Plane,
   PlusCircle,
@@ -58,6 +59,7 @@ export function CommandPalette({
       // Navigasi Halaman
       { id: "p-overview", title: "Overview Dashboard", category: "Halaman", icon: Activity, action: () => onNavigate("overview") },
       { id: "p-finance", title: "Expense Tracking (Keuangan)", category: "Halaman", icon: CircleDollarSign, action: () => onNavigate("finance") },
+      { id: "p-household", title: "Household Expenses (Rumah Tangga)", category: "Halaman", icon: Home, action: () => onNavigate("household") },
       { id: "p-planner", title: "Life Planner (Aktivitas)", category: "Halaman", icon: CheckSquare, action: () => onNavigate("planner") },
       { id: "p-accounts", title: "Bank & E-Wallet Accounts", category: "Halaman", icon: CreditCard, action: () => onNavigate("bank-accounts") },
       { id: "p-goals", title: "Financial Goals (Impian)", category: "Halaman", icon: Target, action: () => onNavigate("goals") },
@@ -97,6 +99,27 @@ export function CommandPalette({
           onNavigate("bank-accounts");
           window.dispatchEvent(new CustomEvent("life-planner:open-add-account"));
         },
+      },
+      {
+        id: "a-household-open",
+        title: "Buka Household Expenses",
+        category: "Aksi Cepat",
+        icon: Home,
+        action: () => onNavigate("household"),
+      },
+      {
+        id: "a-household-bill",
+        title: "Catat Tagihan Rumah Tangga",
+        category: "Aksi Cepat",
+        icon: Home,
+        action: () => onNavigate("household"),
+      },
+      {
+        id: "a-household-due",
+        title: "Cek Tagihan Jatuh Tempo",
+        category: "Aksi Cepat",
+        icon: Home,
+        action: () => onNavigate("household"),
       },
     ];
 

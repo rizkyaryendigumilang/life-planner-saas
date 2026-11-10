@@ -37,11 +37,13 @@ import type {
   Trip,
   Investment,
   MarketQuote,
+  BankAccount,
 } from "../types";
 
 import { getMarketQuotes } from "../lib/marketData";
 import { MarketOverview } from "../components/MarketOverview";
 import ScanBillDialog from "../components/ScanBillDialog";
+import { HouseholdPulseCard } from "../components/HouseholdPulseCard";
 
 type TimeframeKey =
   | "today"
@@ -323,6 +325,9 @@ export function Dashboard({
   const [investments, setInvestments] =
     useState<Investment[]>(() => initialCache?.investments || []);
 
+  const [bankAccounts, setBankAccounts] =
+    useState<BankAccount[]>([]);
+
   const [quotes, setQuotes] =
     useState<Map<string, MarketQuote>>(
       () => initialCache?.quotes || new Map(),
@@ -350,6 +355,7 @@ export function Dashboard({
           taskRes,
           tripRes,
           investmentRes,
+          bankAccountsRes,
         ] = await Promise.all([
           pb
             .collection("expenses")
@@ -378,6 +384,13 @@ export function Dashboard({
               sort: "-updated,-created",
               fields: "id,user,mode,asset_type,symbol,asset_name,quantity,average_price",
             }),
+
+          pb
+            .collection("bank_accounts")
+            .getFullList<BankAccount>({
+              sort: "bank_name",
+            })
+            .catch(() => [] as BankAccount[]),
         ]);
 
         if (!active) {
@@ -390,6 +403,7 @@ export function Dashboard({
         setInvestments(
           investmentRes.items,
         );
+        setBankAccounts(bankAccountsRes);
 
         const resolvedQuotes = await getMarketQuotes(
           investmentRes.items,
@@ -935,6 +949,16 @@ export function Dashboard({
             )}
           </div>
         </Card>
+      </div>
+
+      {/* Household Pulse */}
+      <div className="mt-4">
+        <HouseholdPulseCard
+          expenses={expenses}
+          loading={loading}
+          bankAccounts={bankAccounts}
+          onRefresh={() => setReloadKey((k) => k + 1)}
+        />
       </div>
 
       {/* Market Monitor */}
