@@ -9,6 +9,7 @@ import {
   Command,
   CreditCard,
   Home,
+  LifeBuoy,
   PawPrint,
   Plane,
   PlusCircle,
@@ -24,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import type { Page } from "./layout";
+import { openHelpdeskTicket } from "../lib/helpdesk";
 
 interface CommandItem {
   id: string;
@@ -120,6 +122,13 @@ export function CommandPalette({
         category: "Aksi Cepat",
         icon: Home,
         action: () => onNavigate("household"),
+      },
+      {
+        id: "a-helpdesk",
+        title: "Bantuan / Laporkan Kendala (Buat Tiket Baru)",
+        category: "Aksi Cepat",
+        icon: LifeBuoy,
+        action: () => openHelpdeskTicket(),
       },
     ];
 

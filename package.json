@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "api:dev": "node server/index.mjs",
     "test:isolation": "node scripts/test-isolation.mjs",
-    "test": "node --check server/index.mjs && node --check pocketbase/pb_hooks/life_planner_auth.pb.js && node scripts/test-isolation.mjs && node scripts/smoke-api.mjs && node scripts/test-household.mjs",
+    "test": "node --check server/index.mjs && node --check pocketbase/pb_hooks/life_planner_auth.pb.js && node scripts/test-isolation.mjs && node scripts/smoke-api.mjs && node scripts/test-household.mjs && node scripts/test-helpdesk.mjs",
     "tunnel": "node scripts/tunnel.mjs",
     "setup:oauth": "node scripts/setup-oauth.mjs",
     "typecheck": "tsc --noEmit",

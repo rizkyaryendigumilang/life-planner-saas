@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Activity, CalendarDays, CheckSquare, CircleDollarSign, CreditCard, Download, Eye,
-  Home, LogOut, Menu, Monitor, Moon, PawPrint, Plane, Search, Settings2, Shield,
+  Activity, CalendarDays, CheckSquare, CircleDollarSign, CreditCard, Download, ExternalLink, Eye,
+  Home, LifeBuoy, LogOut, Menu, Monitor, Moon, PawPrint, Plane, Search, Settings2, Shield,
   Smartphone, Sun, Target, Ticket, X, WalletCards,
 } from "lucide-react";
 import { Button } from "./ui";
@@ -11,6 +11,7 @@ import { useTheme, type ThemePreference } from "../hooks/use-theme";
 import { usePwa } from "../hooks/use-pwa";
 import type { Role } from "../types";
 import { BrandLogo } from "./BrandLogo";
+import { openHelpdeskTicket } from "../lib/helpdesk";
 
 export type Page = "overview" | "planner" | "finance" | "household" | "bank-accounts" | "portfolio" | "pets" | "travel" | "goals" | "calendar" | "entertainment" | "device" | "admin" | "settings";
 
@@ -290,6 +291,16 @@ export function AppShell({ page, onPage, role, onLogout, onOpenCommandPalette, c
             <Settings2 size={16} strokeWidth={1.9} className={page === "settings" ? "text-ink" : "text-ink-faint"} aria-hidden="true" />
             <span>Settings</span>
           </button>
+          <button
+            type="button"
+            onClick={() => openHelpdeskTicket()}
+            className="flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-ink-soft transition hover:bg-line/[.04] hover:text-ink"
+            title="Buka tiket bantuan / laporkan kendala ke VPS Helpdesk"
+          >
+            <LifeBuoy size={16} strokeWidth={1.9} className="text-ink-faint" aria-hidden="true" />
+            <span className="flex-1">Bantuan & Kendala</span>
+            <ExternalLink size={12} className="text-ink-faint" />
+          </button>
           <div className="px-2.5 pt-2">
             <p className="mb-1.5 text-[11px] font-medium text-ink-faint tracking-wide">Theme</p>
             <ThemeToggle />
@@ -330,6 +341,16 @@ export function AppShell({ page, onPage, role, onLogout, onOpenCommandPalette, c
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => openHelpdeskTicket()}
+              aria-label="Bantuan & Laporkan Kendala"
+              title="Bantuan & Laporkan Kendala"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-line/15 bg-surface/70 px-2.5 py-1 text-xs text-ink-soft hover:border-line/25 hover:text-ink transition active:scale-95"
+            >
+              <LifeBuoy size={13} className="text-accent" />
+              <span className="hidden sm:inline">Bantuan</span>
+            </button>
             {onOpenCommandPalette && (
               <button
                 type="button"

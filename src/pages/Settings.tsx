@@ -11,6 +11,8 @@ import {
   RotateCcw,
   Smartphone,
   Share,
+  LifeBuoy,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { pb } from "../lib/pocketbase";
@@ -19,6 +21,7 @@ import { BrandLogo } from "../components/BrandLogo";
 import { usePwa } from "../hooks/use-pwa";
 import { recycleBin, type TrashedItem } from "../lib/recycle-bin";
 import { formatIDR } from "../lib/utils";
+import { openHelpdeskTicket } from "../lib/helpdesk";
 
 const OWNED_COLLECTIONS = [
   "expenses",
@@ -353,6 +356,60 @@ export function Settings() {
 
         {/* Kolom Kanan */}
         <div className="space-y-5">
+          {/* Card: Bantuan & Laporkan Kendala (Helpdesk SSO Handoff) */}
+          <Card className="overflow-hidden border-line/15 bg-surface">
+            <div className="flex items-center justify-between border-b border-line/10 p-5 bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-ink shadow-xs">
+                  <LifeBuoy size={19} className="stroke-[2]" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-ink">Bantuan & Laporkan Kendala</h2>
+                  <p className="mt-0.5 text-xs text-ink-soft">
+                    Pusat tiket bantuan terpusat dengan SSO Handoff instan
+                  </p>
+                </div>
+              </div>
+              <Badge tone="accent" className="text-[10px]">
+                Helpdesk VPS
+              </Badge>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <p className="text-xs leading-5 text-ink-soft">
+                Mengalami kendala, error, atau memiliki masukan perbaikan? Tekan tombol di bawah untuk langsung membuka formulir pembuatan tiket di sistem Helpdesk tanpa harus login atau registrasi ulang.
+              </p>
+
+              <div className="rounded-xl border border-line/10 bg-muted/40 p-3.5 text-xs leading-5 text-ink-soft space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span>Aplikasi Terdaftar:</span>
+                  <span className="font-semibold text-ink">life-planner</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Identitas Pengguna:</span>
+                  <span className="font-semibold text-ink truncate max-w-[220px]">
+                    {user?.name || user?.email || "Pengguna"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Peran Akun:</span>
+                  <Badge tone={user?.role === "superadmin" ? "accent" : "neutral"} className="text-[10px]">
+                    {user?.role === "superadmin" ? "Admin" : "Member"}
+                  </Badge>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => openHelpdeskTicket()}
+                className="w-full gap-2 py-2.5 font-medium"
+              >
+                <LifeBuoy size={16} />
+                <span>Buat Tiket Baru di Helpdesk</span>
+                <ExternalLink size={14} className="opacity-70 ml-auto" />
+              </Button>
+            </div>
+          </Card>
+
           {/* Card 4: Tempat Sampah (Recycle Bin / Soft Delete) */}
           <Card className="overflow-hidden border-line/15 bg-surface">
             <div className="flex items-center justify-between border-b border-line/10 p-5 bg-muted/20">
