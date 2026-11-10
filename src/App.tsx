@@ -7,6 +7,7 @@ import { Login } from "./pages/Login";
 import { AppShell, type Page } from "./components/layout";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CommandPalette } from "./components/CommandPalette";
+import { HelpdeskModal } from "./components/HelpdeskModal";
 import { OfflineBanner } from "./components/OfflineBanner";
 import { Toaster, toast } from "sonner";
 
@@ -46,6 +47,7 @@ function Workspace() {
   const { resolved, toggle: toggleTheme } = useTheme();
   const [page, setPage] = useState<Page>("overview");
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [helpdeskModalOpen, setHelpdeskModalOpen] = useState(false);
 
   useCapacitor({
     page,
@@ -57,6 +59,12 @@ function Workspace() {
     const handler = (event: Event) => setPage((event as CustomEvent<Page>).detail);
     window.addEventListener("life-planner:navigate", handler);
     return () => window.removeEventListener("life-planner:navigate", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setHelpdeskModalOpen(true);
+    window.addEventListener("life-planner:open-helpdesk", handler);
+    return () => window.removeEventListener("life-planner:open-helpdesk", handler);
   }, []);
 
   useEffect(() => {
@@ -118,6 +126,10 @@ function Workspace() {
         onNavigate={setPage}
         onToggleTheme={toggleTheme}
         role={auth.role}
+      />
+      <HelpdeskModal
+        open={helpdeskModalOpen}
+        onOpenChange={setHelpdeskModalOpen}
       />
       <OfflineBanner />
       {toaster}

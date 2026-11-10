@@ -21,7 +21,7 @@ import { BrandLogo } from "../components/BrandLogo";
 import { usePwa } from "../hooks/use-pwa";
 import { recycleBin, type TrashedItem } from "../lib/recycle-bin";
 import { formatIDR } from "../lib/utils";
-import { openHelpdeskTicket } from "../lib/helpdesk";
+import { openHelpdeskModal, openHelpdeskTicket } from "../lib/helpdesk";
 
 const OWNED_COLLECTIONS = [
   "expenses",
@@ -400,7 +400,7 @@ export function Settings() {
               </div>
 
               <Button
-                onClick={() => openHelpdeskTicket()}
+                onClick={() => openHelpdeskModal()}
                 className="w-full gap-2 py-2.5 font-medium"
               >
                 <LifeBuoy size={16} />

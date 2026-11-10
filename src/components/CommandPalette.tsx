@@ -25,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import type { Page } from "./layout";
-import { openHelpdeskTicket } from "../lib/helpdesk";
+import { openHelpdeskModal } from "../lib/helpdesk";
 
 interface CommandItem {
   id: string;
@@ -128,7 +128,7 @@ export function CommandPalette({
         title: "Bantuan / Laporkan Kendala (Buat Tiket Baru)",
         category: "Aksi Cepat",
         icon: LifeBuoy,
-        action: () => openHelpdeskTicket(),
+        action: () => openHelpdeskModal(),
       },
     ];
 

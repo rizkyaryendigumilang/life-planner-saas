@@ -11,7 +11,7 @@ import { useTheme, type ThemePreference } from "../hooks/use-theme";
 import { usePwa } from "../hooks/use-pwa";
 import type { Role } from "../types";
 import { BrandLogo } from "./BrandLogo";
-import { openHelpdeskTicket } from "../lib/helpdesk";
+import { openHelpdeskModal } from "../lib/helpdesk";
 
 export type Page = "overview" | "planner" | "finance" | "household" | "bank-accounts" | "portfolio" | "pets" | "travel" | "goals" | "calendar" | "entertainment" | "device" | "admin" | "settings";
 
@@ -293,7 +293,7 @@ export function AppShell({ page, onPage, role, onLogout, onOpenCommandPalette, c
           </button>
           <button
             type="button"
-            onClick={() => openHelpdeskTicket()}
+            onClick={() => openHelpdeskModal()}
             className="flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-ink-soft transition hover:bg-line/[.04] hover:text-ink"
             title="Buka tiket bantuan / laporkan kendala ke VPS Helpdesk"
           >
@@ -343,7 +343,7 @@ export function AppShell({ page, onPage, role, onLogout, onOpenCommandPalette, c
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => openHelpdeskTicket()}
+              onClick={() => openHelpdeskModal()}
               aria-label="Bantuan & Laporkan Kendala"
               title="Bantuan & Laporkan Kendala"
               className="inline-flex items-center gap-1.5 rounded-lg border border-line/15 bg-surface/70 px-2.5 py-1 text-xs text-ink-soft hover:border-line/25 hover:text-ink transition active:scale-95"
