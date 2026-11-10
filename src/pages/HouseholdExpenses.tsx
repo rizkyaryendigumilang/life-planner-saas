@@ -38,7 +38,9 @@ import {
 import ScanBillDialog from "../components/ScanBillDialog";
 import {
   getHouseholdBills,
-  saveHouseholdBills,
+  fetchHouseholdBills,
+  upsertHouseholdBillRemote,
+  deleteHouseholdBillRemote,
   getHouseholdStats,
   isHouseholdExpense,
   extractHouseholdSubcategory,
@@ -131,7 +133,7 @@ export function HouseholdExpenses() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [expenseRes, accountsRes] = await Promise.all([
+      const [expenseRes, accountsRes, billsRes] = await Promise.all([
         pb.collection("expenses").getList<Expense>(1, 200, {
           sort: "-date,-created",
           filter: `date >= "${currentMonthKey}-01" || notes ~ "[Household]"`,
@@ -140,10 +142,12 @@ export function HouseholdExpenses() {
           .collection("bank_accounts")
           .getFullList<BankAccount>({ sort: "bank_name" })
           .catch(() => [] as BankAccount[]),
+        fetchHouseholdBills(),
       ]);
 
       setExpenses(expenseRes.items);
       setBankAccounts(accountsRes);
+      setBills(billsRes);
     } catch (err) {
       console.error("Failed to load household expenses:", err);
       toast.error("Gagal memuat data pengeluaran rumah tangga.");
@@ -289,8 +293,8 @@ export function HouseholdExpenses() {
     }
   };
 
-  // Save / Update Recurring Bill Config
-  const handleSaveBillConfig = () => {
+  // Save / Update Recurring Bill Config in PocketBase & Local Cache
+  const handleSaveBillConfig = async () => {
     if (!billName.trim()) {
       toast.error("Nama tagihan wajib diisi.");
       return;
@@ -298,43 +302,37 @@ export function HouseholdExpenses() {
     const amt = Number(billAmount) || 0;
     const due = Math.min(Math.max(Number(billDueDay) || 1, 1), 31);
 
-    let updatedBills: HouseholdBillConfig[];
-    if (editingBill) {
-      updatedBills = bills.map((b) =>
-        b.id === editingBill.id
-          ? {
-              ...b,
-              name: billName.trim(),
-              subCategory: billSubCategory,
-              defaultAmount: amt,
-              dueDay: due,
-            }
-          : b,
-      );
-    } else {
-      const newBill: HouseholdBillConfig = {
-        id: `bill-${Date.now()}`,
+    try {
+      await upsertHouseholdBillRemote({
+        id: editingBill?.id,
         name: billName.trim(),
         subCategory: billSubCategory,
         defaultAmount: amt,
         dueDay: due,
-      };
-      updatedBills = [...bills, newBill];
-    }
+      });
 
-    saveHouseholdBills(updatedBills);
-    setBills(updatedBills);
-    setBillConfigOpen(false);
-    setEditingBill(null);
-    toast.success("Konfigurasi tagihan berhasil disimpan.");
+      const updated = await fetchHouseholdBills();
+      setBills(updated);
+      setBillConfigOpen(false);
+      setEditingBill(null);
+      toast.success("Konfigurasi tagihan berhasil disimpan ke cloud.");
+    } catch (err) {
+      console.error("Failed to save bill config:", err);
+      toast.error("Gagal menyimpan konfigurasi tagihan.");
+    }
   };
 
-  // Delete Recurring Bill Config
-  const handleDeleteBillConfig = (id: string) => {
-    const updated = bills.filter((b) => b.id !== id);
-    saveHouseholdBills(updated);
-    setBills(updated);
-    toast.success("Tagihan dihapus dari daftar pantauan.");
+  // Delete Recurring Bill Config in PocketBase & Local Cache
+  const handleDeleteBillConfig = async (id: string) => {
+    try {
+      await deleteHouseholdBillRemote(id);
+      const updated = await fetchHouseholdBills();
+      setBills(updated);
+      toast.success("Tagihan dihapus dari cloud.");
+    } catch (err) {
+      console.error("Failed to delete bill config:", err);
+      toast.error("Gagal menghapus tagihan.");
+    }
   };
 
   // Save Grocery Budget

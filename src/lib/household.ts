@@ -1,5 +1,5 @@
 import { pb } from "./pocketbase";
-import type { Expense } from "../types";
+import type { Expense, HouseholdBill } from "../types";
 
 export const HOUSEHOLD_SUBCATEGORIES = [
   "Listrik PLN",
@@ -54,7 +54,6 @@ export const DEFAULT_HOUSEHOLD_BILLS: HouseholdBillConfig[] = [
   },
 ];
 
-// shortcut: localStorage stores recurring bill templates per userId; when multi-device sync of bill definitions is needed, migrate templates to a dedicated PB collection.
 const BILLS_STORAGE_PREFIX = "lp_household_bills_";
 
 /**
@@ -122,7 +121,7 @@ export function buildHouseholdNotes(
 }
 
 /**
- * Mengambil daftar konfigurasi tagihan rutin rumah tangga milik user.
+ * Mengambil daftar konfigurasi tagihan rutin rumah tangga dari cache lokal.
  */
 export function getHouseholdBills(userId?: string): HouseholdBillConfig[] {
   try {
@@ -141,9 +140,9 @@ export function getHouseholdBills(userId?: string): HouseholdBillConfig[] {
 }
 
 /**
- * Menyimpan konfigurasi tagihan rutin rumah tangga ke localStorage.
+ * Menyimpan konfigurasi tagihan rutin rumah tangga ke cache lokal dan emit event.
  */
-export function saveHouseholdBills(
+export function saveHouseholdBillsLocal(
   bills: HouseholdBillConfig[],
   userId?: string,
 ): void {
@@ -154,9 +153,142 @@ export function saveHouseholdBills(
       new CustomEvent("life-planner:household-bills-updated", { detail: bills }),
     );
   } catch (err) {
-    console.error("Error saving household bills:", err);
+    console.error("Error saving household bills local:", err);
   }
 }
+
+/**
+ * Mengambil daftar konfigurasi tagihan rutin dari PocketBase dengan multi-tenant isolation.
+ * Jika pengguna baru belum memiliki tagihan, otomatis seeding template default ke database.
+ */
+export async function fetchHouseholdBills(
+  userId?: string,
+): Promise<HouseholdBillConfig[]> {
+  const user = userId || pb.authStore.record?.id;
+  if (!user) return DEFAULT_HOUSEHOLD_BILLS;
+
+  try {
+    const records = await pb
+      .collection("household_bills")
+      .getFullList<HouseholdBill>({
+        sort: "due_day",
+        filter: `user = "${user}"`,
+      });
+
+    if (records.length === 0) {
+      // Auto-seeding template default ke PocketBase
+      const seeded: HouseholdBillConfig[] = [];
+      for (const def of DEFAULT_HOUSEHOLD_BILLS) {
+        try {
+          const created = await pb.collection("household_bills").create({
+            user,
+            name: def.name,
+            sub_category: def.subCategory,
+            default_amount: def.defaultAmount,
+            due_day: def.dueDay,
+          });
+          seeded.push({
+            id: created.id,
+            name: created.name,
+            subCategory: created.sub_category as HouseholdSubcategory,
+            defaultAmount: Number(created.default_amount || 0),
+            dueDay: Number(created.due_day || 20),
+          });
+        } catch {
+          seeded.push(def);
+        }
+      }
+      saveHouseholdBillsLocal(seeded, user);
+      return seeded;
+    }
+
+    const mapped: HouseholdBillConfig[] = records.map((r) => ({
+      id: r.id,
+      name: r.name,
+      subCategory: r.sub_category as HouseholdSubcategory,
+      defaultAmount: Number(r.default_amount || 0),
+      dueDay: Number(r.due_day || 20),
+    }));
+
+    saveHouseholdBillsLocal(mapped, user);
+    return mapped;
+  } catch (err) {
+    console.error("fetchHouseholdBills error (falling back to local cache):", err);
+    return getHouseholdBills(user);
+  }
+}
+
+/**
+ * Menyimpan atau memperbarui konfigurasi tagihan rutin ke PocketBase.
+ */
+export async function upsertHouseholdBillRemote(
+  bill: Omit<HouseholdBillConfig, "id"> & { id?: string },
+  userId?: string,
+): Promise<HouseholdBillConfig> {
+  const user = userId || pb.authStore.record?.id;
+  if (!user) throw new Error("User tidak terotentikasi");
+
+  let result: HouseholdBillConfig;
+  if (bill.id && !bill.id.startsWith("bill-")) {
+    const updated = await pb.collection("household_bills").update(bill.id, {
+      name: bill.name,
+      sub_category: bill.subCategory,
+      default_amount: bill.defaultAmount,
+      due_day: bill.dueDay,
+    });
+    result = {
+      id: updated.id,
+      name: updated.name,
+      subCategory: updated.sub_category as HouseholdSubcategory,
+      defaultAmount: Number(updated.default_amount || 0),
+      dueDay: Number(updated.due_day || 20),
+    };
+  } else {
+    const created = await pb.collection("household_bills").create({
+      user,
+      name: bill.name,
+      sub_category: bill.subCategory,
+      default_amount: bill.defaultAmount,
+      due_day: bill.dueDay,
+    });
+    result = {
+      id: created.id,
+      name: created.name,
+      subCategory: created.sub_category as HouseholdSubcategory,
+      defaultAmount: Number(created.default_amount || 0),
+      dueDay: Number(created.due_day || 20),
+    };
+  }
+
+  const current = getHouseholdBills(user).filter(
+    (b) => b.id !== result.id && b.id !== bill.id,
+  );
+  const updatedList = [...current, result].sort((a, b) => a.dueDay - b.dueDay);
+  saveHouseholdBillsLocal(updatedList, user);
+  return result;
+}
+
+/**
+ * Menghapus konfigurasi tagihan rutin dari PocketBase.
+ */
+export async function deleteHouseholdBillRemote(
+  id: string,
+  userId?: string,
+): Promise<void> {
+  const user = userId || pb.authStore.record?.id;
+  if (id && !id.startsWith("bill-")) {
+    try {
+      await pb.collection("household_bills").delete(id);
+    } catch (err) {
+      console.error("Failed to delete bill from PocketBase:", err);
+    }
+  }
+  const current = getHouseholdBills(user).filter((b) => b.id !== id);
+  saveHouseholdBillsLocal(current, user);
+}
+
+// Deprecated alias for backwards compatibility
+export const saveHouseholdBills = saveHouseholdBillsLocal;
 
 export interface BillPaymentStatus {
   bill: HouseholdBillConfig;

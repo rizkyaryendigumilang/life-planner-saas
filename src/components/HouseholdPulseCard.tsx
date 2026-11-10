@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -12,6 +12,7 @@ import { Badge, Button, Card, Skeleton } from "./ui";
 import { formatIDR, formatDate } from "../lib/utils";
 import {
   getHouseholdBills,
+  fetchHouseholdBills,
   getHouseholdStats,
   type HouseholdBillConfig,
 } from "../lib/household";
@@ -33,8 +34,18 @@ export function HouseholdPulseCard({
   onRefresh,
 }: HouseholdPulseCardProps) {
   const [markingPaidId, setMarkingPaidId] = useState<string | null>(null);
+  const [bills, setBills] = useState<HouseholdBillConfig[]>(() => getHouseholdBills());
 
-  const bills = useMemo(() => getHouseholdBills(), []);
+  useEffect(() => {
+    void fetchHouseholdBills().then(setBills);
+
+    const onBillsUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<HouseholdBillConfig[]>).detail;
+      if (detail) setBills(detail);
+    };
+    window.addEventListener("life-planner:household-bills-updated", onBillsUpdated);
+    return () => window.removeEventListener("life-planner:household-bills-updated", onBillsUpdated);
+  }, []);
 
   const stats = useMemo(() => {
     return getHouseholdStats(expenses, bills);

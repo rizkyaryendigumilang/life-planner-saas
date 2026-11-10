@@ -42,6 +42,15 @@ export type Expense = {
   account?: string;
 };
 
+export type HouseholdBill = {
+  id: string;
+  user: string;
+  name: string;
+  sub_category: string;
+  default_amount: number;
+  due_day: number;
+};
+
 export type Trip = {
   id: string;
   user: string;

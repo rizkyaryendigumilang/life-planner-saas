@@ -54,6 +54,7 @@ const personalCollections = [
   "market_watchlist",
   "expense_ingestions",
   "investments",
+  "household_bills",
 ];
 
 const migrationsDir = path.join(rootDir, "pocketbase", "pb_migrations");
@@ -72,7 +73,7 @@ if (fs.existsSync(refPath)) {
   }
 }
 
-assert(personalCollections.length === 14, "All 14 personal tenant collections are tracked");
+assert(personalCollections.length === 15, "All 15 personal tenant collections are tracked");
 assert(migrationFiles.length > 0, `Found ${migrationFiles.length} migration files in pocketbase/pb_migrations`);
 
 // Verify that migrations enforce tenant ownership
