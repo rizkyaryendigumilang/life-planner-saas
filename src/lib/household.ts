@@ -176,10 +176,9 @@ export async function fetchHouseholdBills(
       });
 
     if (records.length === 0) {
-      // Auto-seeding template default ke PocketBase
-      const seeded: HouseholdBillConfig[] = [];
-      for (const def of DEFAULT_HOUSEHOLD_BILLS) {
-        try {
+      // Auto-seeding template default ke PocketBase secara paralel (low latency)
+      const seedResults = await Promise.allSettled(
+        DEFAULT_HOUSEHOLD_BILLS.map(async (def) => {
           const created = await pb.collection("household_bills").create({
             user,
             name: def.name,
@@ -187,17 +186,23 @@ export async function fetchHouseholdBills(
             default_amount: def.defaultAmount,
             due_day: def.dueDay,
           });
-          seeded.push({
+          return {
             id: created.id,
             name: created.name,
             subCategory: created.sub_category as HouseholdSubcategory,
             defaultAmount: Number(created.default_amount || 0),
             dueDay: Number(created.due_day || 20),
-          });
-        } catch {
-          seeded.push(def);
+          };
+        }),
+      );
+
+      const seeded: HouseholdBillConfig[] = seedResults.map((res, index) => {
+        if (res.status === "fulfilled") {
+          return res.value;
         }
-      }
+        return DEFAULT_HOUSEHOLD_BILLS[index];
+      });
+
       saveHouseholdBillsLocal(seeded, user);
       return seeded;
     }

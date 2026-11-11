@@ -75,7 +75,7 @@ export function HelpdeskModal({
     };
   }, [photoFile]);
 
-  // Reset form saat dialog dibuka ulang
+  // Reset form dan bebaskan memori saat dialog dibuka ulang atau ditutup
   useEffect(() => {
     if (open) {
       setSubject(defaultSubject);
@@ -84,6 +84,12 @@ export function HelpdeskModal({
       setPhotoFile(null);
       setIsDragging(false);
       setSubmitting(false);
+    } else {
+      setPhotoFile(null);
+      if (photoPreview) {
+        URL.revokeObjectURL(photoPreview);
+        setPhotoPreview(null);
+      }
     }
   }, [open, defaultSubject, defaultCategory]);
 
