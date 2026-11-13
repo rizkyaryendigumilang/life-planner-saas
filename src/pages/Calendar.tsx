@@ -162,8 +162,9 @@ export function Calendar() {
       if (!userId) return;
 
       // Date range window: 1 month before cursor to 1 month after cursor (+-1 month buffer)
-      const startDate = new Date(targetCursor.year, targetCursor.month - 1, 1).toISOString().slice(0, 10);
-      const endDate = new Date(targetCursor.year, targetCursor.month + 2, 0).toISOString().slice(0, 10);
+      // Uses local dateKey to avoid UTC shift bug in non-zero timezones
+      const startDate = dateKey(new Date(targetCursor.year, targetCursor.month - 1, 1));
+      const endDate = dateKey(new Date(targetCursor.year, targetCursor.month + 2, 0));
 
       const taskFilter = `user = "${userId}" && due_date >= "${startDate}" && due_date <= "${endDate}"`;
       const tripFilter = `user = "${userId}" && start_date <= "${endDate}"`;

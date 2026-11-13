@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { pb } from "../lib/pocketbase";
 import { Button, Card, Dialog, Input, Label, Select, SelectItem } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import SwipeCardDeck from "../components/SwipeCardDeck";
 import { recycleBin } from "../lib/recycle-bin";
 import { formatDate, formatIDR, maskAccountNumber } from "../lib/utils";
@@ -62,6 +63,8 @@ export function BankAccounts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<AccountForm>(emptyForm);
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<BankAccount | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const onAdd = () => {
@@ -217,22 +220,28 @@ export function BankAccounts() {
     }
   };
 
-  const handleDelete = async (account: BankAccount) => {
-    const confirmed = window.confirm(`Pindahkan akun ${account.bank_name} ke Tempat Sampah (Recycle Bin)?`);
-    if (!confirmed) return;
+  const handleDelete = (account: BankAccount) => {
+    setAccountToDelete(account);
+  };
 
+  const confirmDelete = async () => {
+    if (!accountToDelete) return;
+    setDeleting(true);
     try {
-      await recycleBin.trash("bank_accounts", account, {
+      await recycleBin.trash("bank_accounts", accountToDelete, {
         typeLabel: "Account",
-        title: account.bank_name,
-        subtitle: `${account.account_type} · ${maskAccountNumber(account.account_number)}`,
-        amount: Number(account.balance || 0),
+        title: accountToDelete.bank_name,
+        subtitle: `${accountToDelete.account_type} · ${maskAccountNumber(accountToDelete.account_number)}`,
+        amount: Number(accountToDelete.balance || 0),
       });
-      toast.success(`${account.bank_name} dipindahkan ke Tempat Sampah.`);
+      toast.success(`${accountToDelete.bank_name} dipindahkan ke Tempat Sampah.`);
+      setAccountToDelete(null);
       await loadAccounts();
     } catch (error) {
       console.error("Failed to delete account:", error);
       toast.error("Gagal menghapus akun.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -538,6 +547,18 @@ export function BankAccounts() {
           </div>
         </div>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(accountToDelete)}
+        onOpenChange={(open) => !open && setAccountToDelete(null)}
+        title="Pindahkan ke Tempat Sampah"
+        description={`Pindahkan akun "${accountToDelete?.bank_name}" (${accountToDelete?.account_type}) ke Tempat Sampah (Recycle Bin)?\n\nData dapat dipulihkan kapan saja dari menu Pengaturan.`}
+        confirmLabel="Pindahkan ke Sampah"
+        cancelLabel="Batal"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

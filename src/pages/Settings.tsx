@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { pb } from "../lib/pocketbase";
 import { Badge, Button, Card, Input, Label } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BrandLogo } from "../components/BrandLogo";
 import { usePwa } from "../hooks/use-pwa";
 import { recycleBin, type TrashedItem } from "../lib/recycle-bin";
@@ -55,6 +56,8 @@ export function Settings() {
   // Recycle Bin State
   const [trashedItems, setTrashedItems] = useState<TrashedItem[]>([]);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [itemToDeletePermanently, setItemToDeletePermanently] = useState<TrashedItem | null>(null);
+  const [emptyBinOpen, setEmptyBinOpen] = useState(false);
 
   const loadRecycleBin = () => {
     setTrashedItems(recycleBin.list(user?.id));
@@ -90,17 +93,24 @@ export function Settings() {
   };
 
   const handlePermanentDelete = (item: TrashedItem) => {
-    const ok = window.confirm(`Hapus permanen "${item.title}"? Data tidak akan bisa dikembalikan lagi.`);
-    if (!ok) return;
-    recycleBin.permanentlyDelete(item.id);
+    setItemToDeletePermanently(item);
+  };
+
+  const confirmPermanentDelete = () => {
+    if (!itemToDeletePermanently) return;
+    recycleBin.permanentlyDelete(itemToDeletePermanently.id);
     toast.success("Item telah dihapus secara permanen.");
+    setItemToDeletePermanently(null);
   };
 
   const handleEmptyBin = () => {
-    const ok = window.confirm("Kosongkan semua isi Tempat Sampah? Semua item akan dihapus permanen.");
-    if (!ok) return;
+    setEmptyBinOpen(true);
+  };
+
+  const confirmEmptyBin = () => {
     recycleBin.emptyBin(user?.id);
     toast.success("Tempat sampah telah dikosongkan.");
+    setEmptyBinOpen(false);
   };
 
   async function updatePassword(e: FormEvent) {
@@ -610,6 +620,28 @@ export function Settings() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(itemToDeletePermanently)}
+        onOpenChange={(open) => !open && setItemToDeletePermanently(null)}
+        title="Hapus Permanen"
+        description={`Hapus permanen "${itemToDeletePermanently?.title}" (${itemToDeletePermanently?.typeLabel})?\n\nTindakan ini tidak dapat dibatalkan dan data akan hilang selamanya.`}
+        confirmLabel="Hapus Permanen"
+        cancelLabel="Batal"
+        variant="danger"
+        onConfirm={confirmPermanentDelete}
+      />
+
+      <ConfirmDialog
+        open={emptyBinOpen}
+        onOpenChange={setEmptyBinOpen}
+        title="Kosongkan Tempat Sampah"
+        description="Kosongkan semua isi Tempat Sampah?\n\nSeluruh item yang ada di tempat sampah akan dihapus secara permanen dan tidak dapat dikembalikan."
+        confirmLabel="Kosongkan Semua"
+        cancelLabel="Batal"
+        variant="danger"
+        onConfirm={confirmEmptyBin}
+      />
     </div>
   );
 }

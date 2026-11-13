@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { Badge, Button, Card, Dialog, Input, Label } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { pb } from "../lib/pocketbase";
 import { formatCurrency, formatDate } from "../lib/utils";
 
@@ -144,6 +145,15 @@ export function Goals() {
     useState<Contribution[]>([]);
 
   const [contributionOpen, setContributionOpen] =
+    useState(false);
+
+  const [goalToDelete, setGoalToDelete] =
+    useState<Goal | null>(null);
+
+  const [contributionToDelete, setContributionToDelete] =
+    useState<Contribution | null>(null);
+
+  const [deleting, setDeleting] =
     useState(false);
 
   async function loadGoals() {
@@ -308,40 +318,38 @@ export function Goals() {
     }
   }
 
-  async function handleDeleteGoal(
-    goal: Goal,
-  ) {
-    const confirmed = window.confirm(
-      `Delete "${goal.name}"?`,
-    );
+  function handleDeleteGoal(goal: Goal) {
+    setGoalToDelete(goal);
+  }
 
-    if (!confirmed) return;
-
+  async function confirmDeleteGoal() {
+    if (!goalToDelete) return;
+    setDeleting(true);
     try {
       setError("");
 
       await pb
         .collection("goals")
-        .delete(goal.id);
+        .delete(goalToDelete.id);
 
       if (
-        selectedGoal?.id === goal.id
+        selectedGoal?.id === goalToDelete.id
       ) {
         setSelectedGoal(null);
       }
 
+      setGoalToDelete(null);
       await loadGoals();
-
       toast.success("Goal deleted");
     } catch (err) {
       console.error(
         "Failed to delete goal:",
         err,
       );
-
-      setError(
-        "Unable to delete the goal.",
-      );
+      setError("Unable to delete the goal.");
+      toast.error("Unable to delete goal");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -409,26 +417,22 @@ export function Goals() {
     }
   }
 
-  async function handleDeleteContribution(
-    contribution: Contribution,
-  ) {
-    if (!selectedGoal) return;
+  function handleDeleteContribution(contribution: Contribution) {
+    setContributionToDelete(contribution);
+  }
 
-    const confirmed = window.confirm(
-      "Delete this contribution?",
-    );
-
-    if (!confirmed) return;
-
+  async function confirmDeleteContribution() {
+    if (!contributionToDelete || !selectedGoal) return;
+    setDeleting(true);
     try {
       await pb
         .collection("goal_contributions")
-        .delete(contribution.id);
+        .delete(contributionToDelete.id);
 
       const newCurrentAmount = Math.max(
         0,
         selectedGoal.currentAmount -
-          contribution.amount,
+          contributionToDelete.amount,
       );
 
       await pb
@@ -444,20 +448,19 @@ export function Goals() {
           newCurrentAmount,
       });
 
+      const goalId = selectedGoal.id;
+      setContributionToDelete(null);
       await loadGoals();
-      await loadContributions(
-        selectedGoal.id,
-      );
+      await loadContributions(goalId);
       toast.success("Contribution deleted");
     } catch (err) {
       console.error(
         "Failed to delete contribution:",
         err,
       );
-
-      setError(
-        "Unable to delete contribution.",
-      );
+      toast.error("Unable to delete contribution");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -613,6 +616,30 @@ export function Goals() {
           setContributionOpen(false)
         }
         onSubmit={handleAddContribution}
+      />
+
+      <ConfirmDialog
+        open={Boolean(goalToDelete)}
+        onOpenChange={(open) => !open && setGoalToDelete(null)}
+        title="Delete Goal"
+        description={`Delete "${goalToDelete?.name}"?\n\nThis will permanently remove the goal and all tracked progress.`}
+        confirmLabel="Delete Goal"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDeleteGoal}
+      />
+
+      <ConfirmDialog
+        open={Boolean(contributionToDelete)}
+        onOpenChange={(open) => !open && setContributionToDelete(null)}
+        title="Delete Contribution"
+        description={`Delete this contribution${contributionToDelete ? ` of ${formatCurrency(contributionToDelete.amount)}` : ""}?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDeleteContribution}
       />
     </div>
   );
@@ -798,7 +825,7 @@ function GoalDetail({
   onAddContribution: () => void;
   onDeleteContribution: (
     contribution: Contribution,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
 }) {
   const progress = calculateProgress(goal);
 

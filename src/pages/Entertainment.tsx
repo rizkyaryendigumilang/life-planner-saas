@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Badge, Button, Card, Dialog } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { pb } from "../lib/pocketbase";
 import { formatCurrency, formatDate } from "../lib/utils";
 
@@ -161,6 +162,15 @@ export function Entertainment() {
 
   const [editingExpense, setEditingExpense] =
     useState<TravelExpense | null>(null);
+
+  const [itineraryToDelete, setItineraryToDelete] =
+    useState<ItineraryItem | null>(null);
+
+  const [expenseToDelete, setExpenseToDelete] =
+    useState<TravelExpense | null>(null);
+
+  const [deleting, setDeleting] =
+    useState(false);
 
   async function loadExperiences() {
     try {
@@ -446,21 +456,19 @@ export function Entertainment() {
     }
   }
 
-  async function handleDeleteItinerary(
-    item: ItineraryItem,
-  ) {
-    const confirmed = window.confirm(
-      `Delete "${item.title}" from the itinerary?`,
-    );
+  function handleDeleteItinerary(item: ItineraryItem) {
+    setItineraryToDelete(item);
+  }
 
-    if (!confirmed) return;
-
+  async function confirmDeleteItinerary() {
+    if (!itineraryToDelete) return;
+    setDeleting(true);
     try {
       setError("");
 
       await pb
         .collection("itinerary_items")
-        .delete(item.id);
+        .delete(itineraryToDelete.id);
 
       if (selectedExperience) {
         await loadExperienceDetails(
@@ -468,16 +476,17 @@ export function Entertainment() {
         );
       }
 
+      setItineraryToDelete(null);
       toast.success("Itinerary item deleted");
     } catch (err) {
       console.error(
         "Failed to delete itinerary:",
         err,
       );
-
-      setError(
-        "Unable to delete itinerary.",
-      );
+      setError("Unable to delete the itinerary item.");
+      toast.error("Unable to delete itinerary item");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -559,21 +568,19 @@ export function Entertainment() {
     }
   }
 
-  async function handleDeleteExpense(
-    expense: TravelExpense,
-  ) {
-    const confirmed = window.confirm(
-      `Delete "${expense.description}"?`,
-    );
+  function handleDeleteExpense(expense: TravelExpense) {
+    setExpenseToDelete(expense);
+  }
 
-    if (!confirmed) return;
-
+  async function confirmDeleteExpense() {
+    if (!expenseToDelete) return;
+    setDeleting(true);
     try {
       setError("");
 
       await pb
         .collection("experience_expenses")
-        .delete(expense.id);
+        .delete(expenseToDelete.id);
 
       if (selectedExperience) {
         await loadExperienceDetails(
@@ -581,16 +588,17 @@ export function Entertainment() {
         );
       }
 
+      setExpenseToDelete(null);
       toast.success("Expense deleted");
     } catch (err) {
       console.error(
         "Failed to delete experience expense:",
         err,
       );
-
-      setError(
-        "Unable to delete trip expense.",
-      );
+      setError("Unable to delete the expense.");
+      toast.error("Unable to delete expense");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -850,6 +858,30 @@ export function Entertainment() {
         title="Edit trip expense"
         submitLabel="Save changes"
       />
+
+      <ConfirmDialog
+        open={Boolean(itineraryToDelete)}
+        onOpenChange={(open) => !open && setItineraryToDelete(null)}
+        title="Delete Itinerary Item"
+        description={`Delete "${itineraryToDelete?.title}" from the itinerary?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDeleteItinerary}
+      />
+
+      <ConfirmDialog
+        open={Boolean(expenseToDelete)}
+        onOpenChange={(open) => !open && setExpenseToDelete(null)}
+        title="Delete Expense"
+        description={`Delete "${expenseToDelete?.description}"?`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmDeleteExpense}
+      />
     </div>
   );
 }
@@ -986,14 +1018,14 @@ function ExperienceDetail({
   onEditItinerary: (item: ItineraryItem) => void;
   onDeleteItinerary: (
     item: ItineraryItem,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
   onAddExpense: () => void;
   onEditExpense: (
     expense: TravelExpense,
   ) => void;
   onDeleteExpense: (
     expense: TravelExpense,
-  ) => Promise<void>;
+  ) => void | Promise<void>;
 }) {
   const isTravel = experience.type === "Travel";
 

@@ -36,6 +36,7 @@ import {
   SelectItem,
   Skeleton,
 } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { toast } from "sonner";
 import { API_BASE } from "../lib/hosts";
 import { pb } from "../lib/pocketbase";
@@ -245,6 +246,11 @@ export function Admin() {
   const [loadingBackups, setLoadingBackups] = useState(false);
   const [creatingBackup, setCreatingBackup] = useState(false);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToRevoke, setUserToRevoke] = useState<User | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<User | null>(null);
+  const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
+  const [adminDeleting, setAdminDeleting] = useState(false);
 
   // Mail Settings Tab State
   const [mailSettings, setMailSettings] = useState<MailSettings>({
@@ -537,42 +543,47 @@ export function Admin() {
     }
   }
 
-  async function deleteUser(user: User) {
-    const confirmed = window.confirm(
-      `Hapus pengguna "${user.username}"?\n\nTindakan ini permanen dan tidak dapat dibatalkan.`,
-    );
-    if (!confirmed) return;
+  function deleteUser(user: User) {
+    setUserToDelete(user);
+  }
 
+  async function confirmDeleteUser() {
+    if (!userToDelete) return;
+    setAdminDeleting(true);
     try {
-      await apiRequest<{ success: boolean }>(`/api/admin/users/${user.id}`, {
+      await apiRequest<{ success: boolean }>(`/api/admin/users/${userToDelete.id}`, {
         method: "DELETE",
       });
 
-      setUsers((current) => current.filter((item) => item.id !== user.id));
-      toast.success(`Pengguna "${user.username}" berhasil dihapus`);
+      setUsers((current) => current.filter((item) => item.id !== userToDelete.id));
+      toast.success(`Pengguna "${userToDelete.username}" berhasil dihapus`);
+      setUserToDelete(null);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Gagal menghapus pengguna",
       );
+    } finally {
+      setAdminDeleting(false);
     }
   }
 
   // Force Invalidation / Revoke Sessions
-  async function revokeSessions(user: User) {
-    const confirmed = window.confirm(
-      `Cabut semua sesi dan token shortcut milik "${user.username}"?\n\nPengguna akan seketika di-logout dari semua perangkat dan semua token Apple Shortcut akan dibatalkan.`,
-    );
-    if (!confirmed) return;
+  function revokeSessions(user: User) {
+    setUserToRevoke(user);
+  }
 
-    setActionInProgress(`revoke_${user.id}`);
+  async function confirmRevokeSessions() {
+    if (!userToRevoke) return;
+    setActionInProgress(`revoke_${userToRevoke.id}`);
     try {
       await apiRequest<{ success: boolean; message: string }>(
-        `/api/admin/users/${user.id}/revoke-sessions`,
+        `/api/admin/users/${userToRevoke.id}/revoke-sessions`,
         { method: "POST" },
       );
       toast.success(
-        `Seluruh sesi login & token shortcut untuk "${user.username}" telah dicabut`,
+        `Seluruh sesi login & token shortcut untuk "${userToRevoke.username}" telah dicabut`,
       );
+      setUserToRevoke(null);
       loadUsers();
     } catch (error) {
       toast.error(
@@ -584,19 +595,20 @@ export function Admin() {
   }
 
   // Send Reset Password Email
-  async function sendPasswordResetEmail(user: User) {
-    const confirmed = window.confirm(
-      `Kirim email instruksi reset password resmi ke alamat "${user.email}"?`,
-    );
-    if (!confirmed) return;
+  function sendPasswordResetEmail(user: User) {
+    setUserToResetPassword(user);
+  }
 
-    setActionInProgress(`reset_${user.id}`);
+  async function confirmSendPasswordResetEmail() {
+    if (!userToResetPassword) return;
+    setActionInProgress(`reset_${userToResetPassword.id}`);
     try {
       await apiRequest<{ success: boolean; message: string }>(
-        `/api/admin/users/${user.id}/send-reset-email`,
+        `/api/admin/users/${userToResetPassword.id}/send-reset-email`,
         { method: "POST" },
       );
-      toast.success(`Email reset password berhasil dikirim ke ${user.email}`);
+      toast.success(`Email reset password berhasil dikirim ke ${userToResetPassword.email}`);
+      setUserToResetPassword(null);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -665,23 +677,27 @@ export function Admin() {
     }
   }
 
-  async function deleteBackup(key: string) {
-    const confirmed = window.confirm(
-      `Hapus berkas cadangan "${key}"?\n\nTindakan ini tidak dapat dibatalkan.`,
-    );
-    if (!confirmed) return;
+  function deleteBackup(key: string) {
+    setBackupToDelete(key);
+  }
 
+  async function confirmDeleteBackup() {
+    if (!backupToDelete) return;
+    setAdminDeleting(true);
     try {
       await apiRequest<{ success: boolean }>(
-        `/api/admin/backups/${encodeURIComponent(key)}`,
+        `/api/admin/backups/${encodeURIComponent(backupToDelete)}`,
         { method: "DELETE" },
       );
-      setBackups((current) => current.filter((b) => b.key !== key));
-      toast.success(`Cadangan "${key}" telah dihapus`);
+      setBackups((current) => current.filter((b) => b.key !== backupToDelete));
+      toast.success(`Cadangan "${backupToDelete}" telah dihapus`);
+      setBackupToDelete(null);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Gagal menghapus cadangan",
       );
+    } finally {
+      setAdminDeleting(false);
     }
   }
 
@@ -2021,6 +2037,54 @@ export function Admin() {
           </div>
         )}
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(userToDelete)}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+        title="Hapus Pengguna"
+        description={`Hapus pengguna "${userToDelete?.username}" (${userToDelete?.email})?\n\nTindakan ini permanen dan tidak dapat dibatalkan.`}
+        confirmLabel="Hapus Pengguna"
+        cancelLabel="Batal"
+        variant="danger"
+        loading={adminDeleting}
+        onConfirm={confirmDeleteUser}
+      />
+
+      <ConfirmDialog
+        open={Boolean(userToRevoke)}
+        onOpenChange={(open) => !open && setUserToRevoke(null)}
+        title="Cabut Sesi Pengguna"
+        description={`Cabut semua sesi dan token shortcut milik "${userToRevoke?.username}"?\n\nPengguna akan seketika di-logout dari semua perangkat dan semua token Apple Shortcut akan dibatalkan.`}
+        confirmLabel="Cabut Sesi"
+        cancelLabel="Batal"
+        variant="danger"
+        loading={actionInProgress?.startsWith("revoke_")}
+        onConfirm={confirmRevokeSessions}
+      />
+
+      <ConfirmDialog
+        open={Boolean(userToResetPassword)}
+        onOpenChange={(open) => !open && setUserToResetPassword(null)}
+        title="Kirim Email Reset Password"
+        description={`Kirim email instruksi reset password resmi ke alamat "${userToResetPassword?.email}"?`}
+        confirmLabel="Kirim Email Reset"
+        cancelLabel="Batal"
+        variant="primary"
+        loading={actionInProgress?.startsWith("reset_")}
+        onConfirm={confirmSendPasswordResetEmail}
+      />
+
+      <ConfirmDialog
+        open={Boolean(backupToDelete)}
+        onOpenChange={(open) => !open && setBackupToDelete(null)}
+        title="Hapus Berkas Cadangan"
+        description={`Hapus berkas cadangan "${backupToDelete}"?\n\nTindakan ini permanen dan berkas cadangan tidak dapat dipulihkan lagi.`}
+        confirmLabel="Hapus Cadangan"
+        cancelLabel="Batal"
+        variant="danger"
+        loading={adminDeleting}
+        onConfirm={confirmDeleteBackup}
+      />
     </div>
   );
 }

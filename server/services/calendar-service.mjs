@@ -49,9 +49,10 @@ export function buildCalendarIcs(events, { calendarName = "Life Planner" } = {})
     lines.push(`DTSTAMP:${stamp}`);
     lines.push(`DTSTART;VALUE=DATE:${event.start}`);
     lines.push(`DTEND;VALUE=DATE:${event.end}`);
-    lines.push(icsFold(`SUMMARY:${icsEscape(event.summary)}`));
+    lines.push(icsFold(`SUMMARY:${icsEscape(event.summary || event.title || "")}`));
     if (event.description) lines.push(icsFold(`DESCRIPTION:${icsEscape(event.description)}`));
     if (event.location) lines.push(icsFold(`LOCATION:${icsEscape(event.location)}`));
+    lines.push("TRANSP:TRANSPARENT");
     lines.push("END:VEVENT");
   }
 

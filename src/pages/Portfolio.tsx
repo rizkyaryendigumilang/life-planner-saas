@@ -5,6 +5,7 @@ import { formatIDR } from "../lib/utils";
 import type { Investment, MarketQuote } from "../types";
 import InvestmentDialog from "../components/InvestmentDialog";
 import { Badge, Button, Card } from "../components/ui";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { toast } from "sonner";
 import { getMarketQuotes, isMarketDataConfigured } from "../lib/marketData";
 
@@ -15,6 +16,8 @@ export function Portfolio() {
   const [refreshing, setRefreshing] = useState(false);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Investment | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<Investment | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
@@ -115,16 +118,24 @@ export function Portfolio() {
     }
   };
 
-  const remove = async (item: Investment) => {
-    if (!window.confirm(`Delete ${item.symbol} from your ${item.mode.toLowerCase()}?`)) return;
+  const remove = (item: Investment) => {
+    setItemToDelete(item);
+  };
+
+  const confirmRemove = async () => {
+    if (!itemToDelete) return;
+    setDeleting(true);
     try {
-      await pb.collection("investments").delete(item.id);
-      const next = items.filter((row) => row.id !== item.id);
+      await pb.collection("investments").delete(itemToDelete.id);
+      const next = items.filter((row) => row.id !== itemToDelete.id);
       setItems(next);
       setQuotes(await getMarketQuotes(next));
       toast.success("Investment removed.");
+      setItemToDelete(null);
     } catch {
       toast.error("Unable to delete investment.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -317,6 +328,18 @@ export function Portfolio() {
         }}
         investment={editing}
         onSave={save}
+      />
+
+      <ConfirmDialog
+        open={Boolean(itemToDelete)}
+        onOpenChange={(open) => !open && setItemToDelete(null)}
+        title="Delete Asset"
+        description={`Delete "${itemToDelete?.symbol}" from your ${itemToDelete?.mode.toLowerCase()}?`}
+        confirmLabel="Delete Asset"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={confirmRemove}
       />
     </div>
   );
