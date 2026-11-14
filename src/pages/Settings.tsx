@@ -13,6 +13,16 @@ import {
   Share,
   LifeBuoy,
   ExternalLink,
+  FileJson,
+  FileSpreadsheet,
+  RefreshCw,
+  Loader2,
+  CreditCard,
+  TrendingUp,
+  Target,
+  ListTodo,
+  Receipt,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { pb } from "../lib/pocketbase";
@@ -20,6 +30,7 @@ import { Badge, Button, Card, Input, Label } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BrandLogo } from "../components/BrandLogo";
 import { usePwa } from "../hooks/use-pwa";
+import { useAutoBackup } from "../hooks/use-auto-backup";
 import { recycleBin, type TrashedItem } from "../lib/recycle-bin";
 import { formatIDR } from "../lib/utils";
 import { openHelpdeskModal, openHelpdeskTicket } from "../lib/helpdesk";
@@ -39,6 +50,7 @@ const OWNED_COLLECTIONS = [
   "market_watchlist",
   "expense_ingestions",
   "investments",
+  "household_bills",
 ];
 
 export function Settings() {
@@ -48,6 +60,18 @@ export function Settings() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // Auto-Backup & Export State (JSON & CSV)
+  const [backupFormat, setBackupFormat] = useState<"json" | "csv">("json");
+  const {
+    meta: autoBackupMeta,
+    syncing: autoBackupSyncing,
+    syncNow: autoBackupSyncNow,
+    timeAgoText: autoBackupTimeAgo,
+    downloadJson: autoBackupDownloadJson,
+    downloadConsolidatedCsv: autoBackupDownloadConsolidatedCsv,
+    downloadModuleCsv: autoBackupDownloadModuleCsv,
+  } = useAutoBackup();
 
   // PWA Hook
   const { isStandalone, isIos, canInstall, promptInstall } = usePwa();
@@ -154,16 +178,22 @@ export function Settings() {
   async function exportData() {
     setExporting(true);
     const bundle: Record<string, unknown> = {
+      app: "life-planner",
+      version: 1,
       exportedAt: new Date().toISOString(),
       account: { email: user?.email, name: user?.name, id: user?.id },
+      summary: {} as Record<string, number>,
       data: {},
       notes: [] as string[],
     };
     const data = bundle.data as Record<string, unknown>;
+    const summary = bundle.summary as Record<string, number>;
     const notes = bundle.notes as string[];
     for (const collection of OWNED_COLLECTIONS) {
       try {
-        data[collection] = await pb.collection(collection).getFullList({ sort: "created" });
+        const records = await pb.collection(collection).getFullList({ sort: "created" });
+        data[collection] = records;
+        summary[collection] = records.length;
       } catch {
         notes.push(
           `Collection '${collection}' could not be exported (it may not exist or your account cannot read it).`
@@ -336,31 +366,239 @@ export function Settings() {
             </div>
           </Card>
 
-          {/* Card 3: Export Data */}
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-ink">
-                <Download size={18} />
+          {/* Card 3: Cadangan Data Pribadi & Auto-Sync (JSON & CSV) */}
+          <Card className="overflow-hidden border-line/15 bg-surface">
+            {/* Header Card */}
+            <div className="flex items-center justify-between border-b border-line/10 p-5 bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-xl border border-line/15 bg-surface shadow-xs">
+                  <Database size={18} className="text-accent" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-ink">Cadangan Data & Auto-Sync</h2>
+                  <p className="text-xs text-ink-soft">
+                    Sinkronisasi otomatis latar belakang & unduh cadangan.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="font-semibold text-ink">Export your data</h2>
-                <p className="mt-1 text-sm leading-6 text-ink-soft">
-                  Download records visible to your account as a JSON file for backup or portability.
-                </p>
+
+              {/* Status Indicator */}
+              <div className="flex items-center gap-2">
+                {autoBackupSyncing ? (
+                  <span className="flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] font-medium text-accent">
+                    <Loader2 size={12} className="animate-spin" />
+                    Menyinkronkan…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 rounded-full border border-positive/20 bg-positive/10 px-2.5 py-1 text-[11px] font-medium text-positive">
+                    <span className="h-1.5 w-1.5 rounded-full bg-positive animate-pulse" />
+                    Auto-Sync Aktif
+                  </span>
+                )}
               </div>
             </div>
-            <Button
-              className="mt-4 w-full"
-              variant="outline"
-              disabled={exporting}
-              onClick={() => void exportData()}
-            >
-              {exporting ? "Preparing export…" : "Export my data"}
-              <Download size={15} />
-            </Button>
-            <p className="mt-2 text-[11px] leading-5 text-ink-faint">
-              Only data accessible through your authenticated PocketBase account is included. Keep the downloaded file private.
-            </p>
+
+            <div className="space-y-4 p-5">
+              {/* Telemetry info & Manual Sync Button */}
+              <div className="flex flex-col gap-2 rounded-xl border border-line/12 bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-medium text-ink">
+                    Status Sinkronisasi Terbaru:
+                  </p>
+                  <p className="text-[11px] text-ink-soft">
+                    {autoBackupTimeAgo} · <strong className="text-ink">{autoBackupMeta?.totalRecords ?? 0} data</strong> tersimpan aman
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={autoBackupSyncing}
+                  onClick={() => {
+                    void autoBackupSyncNow().then(() => {
+                      toast.success("Data berhasil disinkronkan ke versi terbaru!");
+                    });
+                  }}
+                  className="self-start sm:self-auto gap-1.5 text-xs"
+                >
+                  <RefreshCw size={13} className={autoBackupSyncing ? "animate-spin text-accent" : ""} />
+                  {autoBackupSyncing ? "Menyinkronkan…" : "Sync Sekarang"}
+                </Button>
+              </div>
+
+              {/* Format Switcher: JSON vs CSV */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-ink-soft">Pilih Format Cadangan:</Label>
+                <div className="grid grid-cols-2 gap-2 rounded-xl border border-line/15 bg-muted/30 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setBackupFormat("json")}
+                    className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all ${
+                      backupFormat === "json"
+                        ? "bg-surface text-ink shadow-xs border border-line/15"
+                        : "text-ink-soft hover:text-ink"
+                    }`}
+                  >
+                    <FileJson size={15} className={backupFormat === "json" ? "text-accent" : "text-ink-soft"} />
+                    Format JSON (Utuh)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBackupFormat("csv")}
+                    className={`flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-all ${
+                      backupFormat === "csv"
+                        ? "bg-surface text-ink shadow-xs border border-line/15"
+                        : "text-ink-soft hover:text-ink"
+                    }`}
+                  >
+                    <FileSpreadsheet size={15} className={backupFormat === "csv" ? "text-positive" : "text-ink-soft"} />
+                    Format CSV (Excel)
+                  </button>
+                </div>
+              </div>
+
+              {/* Konten Pilihan JSON */}
+              {backupFormat === "json" && (
+                <div className="space-y-3 rounded-xl border border-line/12 bg-surface p-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-ink">
+                      Cadangan Sistem Lengkap (15 Modul)
+                    </p>
+                    <p className="text-[11px] leading-5 text-ink-soft">
+                      Menyimpan seluruh transaksi, tagihan rumah tangga, rekening, target, investasi, agenda, perjalanan, dan riwayat dalam 1 berkas JSON terstruktur.
+                    </p>
+                  </div>
+
+                  <Button
+                    className="w-full gap-2 py-2.5"
+                    variant="primary"
+                    disabled={autoBackupSyncing}
+                    onClick={() => {
+                      autoBackupDownloadJson();
+                      toast.success("File cadangan JSON berhasil diunduh.");
+                    }}
+                  >
+                    <Download size={15} />
+                    Unduh Cadangan JSON (.json)
+                  </Button>
+                </div>
+              )}
+
+              {/* Konten Pilihan CSV */}
+              {backupFormat === "csv" && (
+                <div className="space-y-3.5 rounded-xl border border-line/12 bg-surface p-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-ink">
+                      Format Spreadsheet & Excel (RFC 4180 / UTF-8)
+                    </p>
+                    <p className="text-[11px] leading-5 text-ink-soft">
+                      Kompatibel langsung dengan Microsoft Excel, Google Sheets, dan Apple Numbers tanpa konversi.
+                    </p>
+                  </div>
+
+                  {/* Primary CSV Download: Consolidated Ledger */}
+                  <Button
+                    className="w-full gap-2 py-2.5 bg-positive hover:bg-positive/90 text-white"
+                    disabled={autoBackupSyncing}
+                    onClick={() => {
+                      autoBackupDownloadConsolidatedCsv();
+                      toast.success("Buku Kas Terpadu (CSV) berhasil diunduh.");
+                    }}
+                  >
+                    <FileSpreadsheet size={16} />
+                    Unduh Buku Kas Terpadu (.csv)
+                  </Button>
+
+                  <div className="pt-1">
+                    <p className="mb-2 text-[11px] font-semibold text-ink-faint uppercase tracking-wider">
+                      Atau Unduh Berkas Per Modul Spesifik:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("expenses");
+                          toast.success("CSV Transaksi berhasil diunduh.");
+                        }}
+                      >
+                        <Receipt size={14} className="text-accent" />
+                        <span>Transaksi (.csv)</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("household_bills");
+                          toast.success("CSV Tagihan Rumah Tangga berhasil diunduh.");
+                        }}
+                      >
+                        <CreditCard size={14} className="text-warning" />
+                        <span>Rumah Tangga (.csv)</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("bank_accounts");
+                          toast.success("CSV Rekening Bank berhasil diunduh.");
+                        }}
+                      >
+                        <CreditCard size={14} className="text-ink" />
+                        <span>Rekening Bank (.csv)</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("investments");
+                          toast.success("CSV Investasi berhasil diunduh.");
+                        }}
+                      >
+                        <TrendingUp size={14} className="text-positive" />
+                        <span>Investasi (.csv)</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("goals");
+                          toast.success("CSV Target Impian berhasil diunduh.");
+                        }}
+                      >
+                        <Target size={14} className="text-negative" />
+                        <span>Target Impian (.csv)</span>
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start gap-2 text-xs"
+                        onClick={() => {
+                          autoBackupDownloadModuleCsv("tasks");
+                          toast.success("CSV Agenda & Tugas berhasil diunduh.");
+                        }}
+                      >
+                        <ListTodo size={14} className="text-accent" />
+                        <span>Agenda & Tugas (.csv)</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] leading-5 text-ink-faint">
+                Snapshot cadangan otomatis diperbarui saat Anda membuka atau menggunakan aplikasi. File hasil ekspor bersifat pribadi, simpan di media penyimpanan yang aman.
+              </p>
+            </div>
           </Card>
         </div>
 
