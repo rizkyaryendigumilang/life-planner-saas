@@ -44,6 +44,9 @@ import { getMarketQuotes } from "../lib/marketData";
 import { MarketOverview } from "../components/MarketOverview";
 import ScanBillDialog from "../components/ScanBillDialog";
 import { HouseholdPulseCard } from "../components/HouseholdPulseCard";
+import { RecurringTransactionsCard } from "../components/RecurringTransactionsCard";
+import { CashFlowForecastCard } from "../components/CashFlowForecastCard";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 
 type TimeframeKey =
   | "today"
@@ -344,6 +347,11 @@ export function Dashboard({
 
   const [reloadKey, setReloadKey] =
     useState(0);
+
+  // Realtime multi-tab & multi-device sync
+  useRealtimeSync(["expenses", "bank_accounts", "goals", "household_bills"], () => {
+    setReloadKey((k) => k + 1);
+  });
 
   useEffect(() => {
     let active = true;
@@ -959,6 +967,19 @@ export function Dashboard({
           bankAccounts={bankAccounts}
           onRefresh={() => setReloadKey((k) => k + 1)}
         />
+      </div>
+
+      {/* Cash Flow Forecast & Predictive Runway */}
+      <div className="mt-4">
+        <CashFlowForecastCard
+          expenses={expenses}
+          totalBalance={bankAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0)}
+        />
+      </div>
+
+      {/* Recurring Subscriptions & Automatic Bills */}
+      <div className="mt-4">
+        <RecurringTransactionsCard onTransactionCreated={() => setReloadKey((k) => k + 1)} />
       </div>
 
       {/* Market Monitor */}

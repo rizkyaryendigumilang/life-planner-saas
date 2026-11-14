@@ -34,6 +34,8 @@ import { useAutoBackup } from "../hooks/use-auto-backup";
 import { recycleBin, type TrashedItem } from "../lib/recycle-bin";
 import { formatIDR } from "../lib/utils";
 import { openHelpdeskModal, openHelpdeskTicket } from "../lib/helpdesk";
+import { ImportRestoreModal } from "../components/ImportRestoreModal";
+import { ActiveSessionsCard } from "../components/ActiveSessionsCard";
 
 const OWNED_COLLECTIONS = [
   "expenses",
@@ -82,6 +84,7 @@ export function Settings() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [itemToDeletePermanently, setItemToDeletePermanently] = useState<TrashedItem | null>(null);
   const [emptyBinOpen, setEmptyBinOpen] = useState(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false);
 
   const loadRecycleBin = () => {
     setTrashedItems(recycleBin.list(user?.id));
@@ -598,6 +601,17 @@ export function Settings() {
               <p className="text-[11px] leading-5 text-ink-faint">
                 Snapshot cadangan otomatis diperbarui saat Anda membuka atau menggunakan aplikasi. File hasil ekspor bersifat pribadi, simpan di media penyimpanan yang aman.
               </p>
+
+              <div className="pt-2 border-t border-line/10">
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 py-2.5 text-xs font-semibold hover:border-accent hover:text-accent transition"
+                  onClick={() => setIsRestoreModalOpen(true)}
+                >
+                  <Database size={15} className="text-accent" />
+                  <span>Pulihkan / Impor Cadangan Data (JSON / CSV)</span>
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
@@ -816,6 +830,9 @@ export function Settings() {
             </form>
           </Card>
 
+          {/* Active Sessions & Security */}
+          <ActiveSessionsCard />
+
           {/* Card 6: Privacy & Account Isolation */}
           <Card className="p-5">
             <div className="flex items-start gap-3">
@@ -879,6 +896,15 @@ export function Settings() {
         cancelLabel="Batal"
         variant="danger"
         onConfirm={confirmEmptyBin}
+      />
+
+      <ImportRestoreModal
+        isOpen={isRestoreModalOpen}
+        onClose={() => setIsRestoreModalOpen(false)}
+        onSuccess={() => {
+          toast.success("Pemulihan data selesai. Memuat ulang data sistem...");
+          setTimeout(() => window.location.reload(), 1200);
+        }}
       />
     </div>
   );

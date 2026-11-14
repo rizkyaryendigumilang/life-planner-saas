@@ -76,5 +76,6 @@ export function isPublicHttpsBase(value: string) {
   }
 }
 
-export const API_BASE = resolveHost(import.meta.env.VITE_API_BASE_URL, "http://127.0.0.1:3001");
-export const POCKETBASE_BASE = resolveHost(import.meta.env.VITE_POCKETBASE_URL, "http://127.0.0.1:8090");
+const metaEnv = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : (process.env as any || {});
+export const API_BASE = resolveHost(metaEnv.VITE_API_BASE_URL, "http://127.0.0.1:3001");
+export const POCKETBASE_BASE = resolveHost(metaEnv.VITE_POCKETBASE_URL, "http://127.0.0.1:8090");

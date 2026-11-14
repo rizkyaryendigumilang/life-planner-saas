@@ -14,7 +14,12 @@ import { ArrowDownLeft,
   Search,
   Trash2,
   ScanLine,
+  UploadCloud,
   WalletCards, type LucideIcon } from 'lucide-react';
+import { QuickNlpInput } from "../components/QuickNlpInput";
+import { CashFlowForecastCard } from "../components/CashFlowForecastCard";
+import { ImportRestoreModal } from "../components/ImportRestoreModal";
+import { useRealtimeSync } from "../hooks/useRealtimeSync";
 import { API_BASE } from "../lib/hosts";
 import { pb } from "../lib/pocketbase";
 import {
@@ -117,6 +122,16 @@ export function Finance() {
 
   const [open, setOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
+  // Realtime multi-tab & multi-device sync
+  useRealtimeSync(["expenses", "bank_accounts"], () => {
+    load();
+  });
+
+  const totalLiquidAssets = useMemo(() => {
+    return bankAccounts.reduce((sum, acc) => sum + (Number(acc.balance) || 0), 0);
+  }, [bankAccounts]);
 
   const [search, setSearch] =
     useState("");
@@ -927,6 +942,11 @@ export function Finance() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setImportModalOpen(true)}>
+            <UploadCloud size={15} />
+            Import CSV / JSON
+          </Button>
+
           <Button size="sm" variant="outline" onClick={() => setScanOpen(true)}>
             <ScanLine size={15} />
             Scan bill
@@ -1006,6 +1026,11 @@ export function Finance() {
         </div>
       </div>
 
+      {/* Quick NLP Natural Language Transaction Input */}
+      <div className="mb-5">
+        <QuickNlpInput onSuccess={load} />
+      </div>
+
       {/* =====================================================
           METRICS
           ===================================================== */}
@@ -1048,6 +1073,13 @@ export function Finance() {
             expenseCardValue,
           )}
         />
+      </div>
+
+      {/* =====================================================
+          CASH FLOW FORECAST & RUNWAY INTELLIGENCE
+          ===================================================== */}
+      <div className="mt-5 mb-5">
+        <CashFlowForecastCard expenses={items} totalBalance={totalLiquidAssets} />
       </div>
 
       {/* =====================================================
@@ -1486,6 +1518,18 @@ export function Finance() {
         onConfirm={
           handleDelete
         }
+      />
+
+      {/* =====================================================
+          IMPORT & RESTORE MODAL (JSON / CSV)
+          ===================================================== */}
+      <ImportRestoreModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onSuccess={() => {
+          load();
+          toast.success("Data berhasil diimpor.");
+        }}
       />
     </div>
   );

@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "api:dev": "node server/index.mjs",
     "test:isolation": "node scripts/test-isolation.mjs",
-    "test": "node --check server/index.mjs && node --check pocketbase/pb_hooks/life_planner_auth.pb.js && node scripts/test-isolation.mjs && node scripts/smoke-api.mjs && node scripts/test-household.mjs && node scripts/test-helpdesk.mjs && node --experimental-strip-types scripts/test-auto-backup.mjs",
+    "test": "node --check server/index.mjs && node --check pocketbase/pb_hooks/life_planner_auth.pb.js && node scripts/test-isolation.mjs && node scripts/smoke-api.mjs && node scripts/test-household.mjs && node scripts/test-helpdesk.mjs && node --experimental-strip-types scripts/test-auto-backup.mjs && tsx scripts/test-restore-engine.mjs && tsx scripts/test-recurring-engine.mjs && tsx scripts/test-financial-analytics.mjs && tsx scripts/test-security-household.mjs",
     "tunnel": "node scripts/tunnel.mjs",
     "setup:oauth": "node scripts/setup-oauth.mjs",
     "typecheck": "tsc --noEmit",
@@ -56,6 +56,7 @@
     "postcss": "^8.4.49",
     "remotion": "^4.0.448",
     "tailwindcss": "^3.4.16",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
   }

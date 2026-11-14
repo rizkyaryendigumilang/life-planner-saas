@@ -14,4 +14,5 @@ pb.afterSend = (response, data) => {
   return data;
 };
 
-export const isPocketBaseConfigured = Boolean(import.meta.env.VITE_POCKETBASE_URL);
+const metaEnv = typeof import.meta !== "undefined" && import.meta.env ? import.meta.env : (process.env as any || {});
+export const isPocketBaseConfigured = Boolean(metaEnv.VITE_POCKETBASE_URL);

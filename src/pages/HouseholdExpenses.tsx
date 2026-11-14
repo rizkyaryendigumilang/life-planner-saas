@@ -21,7 +21,9 @@ import {
   Utensils,
   Wrench,
   Zap,
+  Users2,
 } from "lucide-react";
+import { HouseholdSettlementCard } from "../components/HouseholdSettlementCard";
 import { pb } from "../lib/pocketbase";
 import { formatIDR, formatDate, maskAccountNumber } from "../lib/utils";
 import {
@@ -54,12 +56,13 @@ import { getBudgets, saveBudgets } from "../lib/budgets";
 import type { BankAccount, Expense } from "../types";
 import { toast } from "sonner";
 
-type TabKey = "utilities" | "groceries" | "maintenance";
+type TabKey = "utilities" | "groceries" | "maintenance" | "collaboration";
 
-const TABS: { id: TabKey; label: string; icon: typeof Zap }[] = [
+const TABS: { id: TabKey; label: string; icon: any }[] = [
   { id: "utilities", label: "Tagihan Rutin & Utilitas", icon: Zap },
   { id: "groceries", label: "Belanja Dapur & Pokok", icon: ShoppingBasket },
   { id: "maintenance", label: "Perawatan & Servis Rumah", icon: Wrench },
+  { id: "collaboration", label: "Bagi Tagihan & Split", icon: Users2 },
 ];
 
 function getCategoryIcon(subcategory: string) {
@@ -832,6 +835,15 @@ export function HouseholdExpenses() {
               </div>
             )}
           </Card>
+        </div>
+      )}
+
+      {/* =====================================================
+          TAB 4: KOLABORASI & BAGI TAGIHAN (SPLIT BILL)
+          ===================================================== */}
+      {activeTab === "collaboration" && (
+        <div className="space-y-4">
+          <HouseholdSettlementCard />
         </div>
       )}
 
