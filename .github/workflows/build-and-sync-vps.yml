@@ -1,11 +1,39 @@
-name: Build Mobile Apps (APK & IPA) and Sync to VPS
+name: Build & Release Mobile Apps (APK & IPA)
 
 on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'android/**'
+      - 'ios/**'
+      - 'capacitor.config.*'
+      - 'package.json'
+      - '.github/workflows/build-and-sync-vps.yml'
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Release version (misal 1.0.1 atau biarkan kosong untuk mendeteksi dari package.json/tag)'
+        required: false
+        default: ''
+      release_title:
+        description: 'Judul Release (opsional, contoh: Life Planner v1.0.1 - Mobile Release)'
+        required: false
+        default: ''
+      release_notes:
+        description: 'Keterangan perbaikan bug / catatan rilis khusus (opsional, jika kosong di-generate otomatis dari git commit)'
+        required: false
+        default: ''
+      publish_release:
+        description: 'Publikasikan otomatis ke GitHub Releases'
+        type: boolean
+        required: true
+        default: true
       target_environment:
         description: 'Environment target (production, staging, development)'
-        required: true
+        required: false
         default: 'production'
         type: choice
         options:
@@ -13,21 +41,16 @@ on:
           - staging
           - development
       api_url:
-        description: 'Express API URL (optional override, e.g. https://api.yourdomain.com)'
+        description: 'Express API URL (optional override)'
         required: false
         default: ''
       pocketbase_url:
-        description: 'PocketBase URL (optional override, e.g. https://pb.yourdomain.com)'
+        description: 'PocketBase URL (optional override)'
         required: false
         default: ''
-  push:
-    branches:
-      - main
-    paths:
-      - 'android/**'
-      - 'ios/**'
-      - 'capacitor.config.*'
-      - '.github/workflows/build-and-sync-vps.yml'
+
+permissions:
+  contents: write
 
 jobs:
   # ==========================================
@@ -43,6 +66,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
@@ -55,6 +80,21 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
+      - name: Determine Version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            RAW_VER="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RAW_VER="${{ github.ref_name }}"
+          else
+            RAW_VER="v$(node -p "require('./package.json').version")"
+          fi
+          RAW_VER="${RAW_VER#v}"
+          echo "version=${RAW_VER}" >> $GITHUB_OUTPUT
+          echo "tag=v${RAW_VER}" >> $GITHUB_OUTPUT
+          node scripts/bump-version.mjs "${RAW_VER}"
 
       - name: Install Dependencies
         run: npm ci
@@ -74,21 +114,25 @@ jobs:
       - name: Sync to Capacitor Android
         run: npx cap sync android
 
-      - name: Build Android APK (Debug)
+      - name: Build Android APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Rename APK File
+      - name: Stage APK Files
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk app-latest.apk
+          VER="${{ steps.ver.outputs.version }}"
+          mkdir -p release-output
+          cp android/app/build/outputs/apk/debug/app-debug.apk "release-output/life-planner-v${VER}-android.apk"
+          cp "release-output/life-planner-v${VER}-android.apk" app-latest.apk
+          echo "Staged APK: release-output/life-planner-v${VER}-android.apk"
 
       - name: Upload APK to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-latest-android-apk
-          path: app-latest.apk
+          name: android-apk
+          path: release-output/*.apk
           retention-days: 14
 
       - name: Transfer APK to VPS via Verified SSH & SCP
@@ -130,24 +174,22 @@ jobs:
 
           echo "Menguji konektivitas SSH ke VPS ($VPS_HOST:$TARGET_PORT)..."
           if ! ssh -o BatchMode=yes -o ConnectTimeout=10 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "echo SSH_CONNECTION_OK" 2>/dev/null; then
-            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak firewall. File APK tetap aman tersimpan di GitHub Artifacts."
+            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak firewall. File APK tetap aman tersimpan di GitHub Artifacts & Releases."
             rm -f "$HOME/.ssh/id_ed25519"
             exit 0
           fi
 
-          # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
           ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')" || true
 
-          # 2. Upload APK via SCP
           echo "Mentransfer app-latest.apk ke VPS..."
           if scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.apk "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.apk"; then
             ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
               "chmod 644 '$VPS_TARGET/app-latest.apk'" || true
             echo "✓ Android APK berhasil ditransfer ke $VPS_TARGET/app-latest.apk"
           else
-            echo "::warning::Transfer SCP APK ke VPS gagal. File APK tetap aman tersimpan di GitHub Artifacts."
+            echo "::warning::Transfer SCP APK ke VPS gagal. File APK tetap aman tersimpan di GitHub Artifacts & Releases."
           fi
 
           rm -f "$HOME/.ssh/id_ed25519"
@@ -166,12 +208,29 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
+
+      - name: Determine Version
+        id: ver
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            RAW_VER="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RAW_VER="${{ github.ref_name }}"
+          else
+            RAW_VER="v$(node -p "require('./package.json').version")"
+          fi
+          RAW_VER="${RAW_VER#v}"
+          echo "version=${RAW_VER}" >> $GITHUB_OUTPUT
+          echo "tag=v${RAW_VER}" >> $GITHUB_OUTPUT
+          node scripts/bump-version.mjs "${RAW_VER}"
 
       - name: Install Dependencies
         run: npm ci
@@ -216,7 +275,9 @@ jobs:
 
       - name: Package App into .ipa
         run: |
+          VER="${{ steps.ver.outputs.version }}"
           mkdir -p build/Payload
+          mkdir -p release-output
           APP_PATH=$(find build/DerivedData/Build/Products/Release-iphoneos -name "*.app" -type d | head -n 1)
           if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
             echo "::error::Could not find compiled .app in DerivedData!"
@@ -225,13 +286,15 @@ jobs:
           echo "Found compiled app at: $APP_PATH"
           cp -r "$APP_PATH" build/Payload/
           cd build
-          zip -r ../app-latest.ipa Payload
+          zip -r "../release-output/life-planner-v${VER}-ios.ipa" Payload
+          cd ..
+          cp "release-output/life-planner-v${VER}-ios.ipa" app-latest.ipa
 
       - name: Upload IPA to GitHub Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: app-latest-ios-ipa
-          path: app-latest.ipa
+          name: ios-ipa
+          path: release-output/*.ipa
           retention-days: 14
 
       - name: Transfer IPA to VPS via SCP
@@ -272,24 +335,112 @@ jobs:
           fi
           echo "Menguji konektivitas SSH ke VPS ($VPS_HOST:$TARGET_PORT)..."
           if ! ssh -o BatchMode=yes -o ConnectTimeout=10 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" "echo SSH_CONNECTION_OK" 2>/dev/null; then
-            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak oleh firewall. File IPA tetap aman tersimpan di GitHub Artifacts."
+            echo "::warning::Koneksi SSH ke VPS ($VPS_HOST:$TARGET_PORT) timed out atau ditolak oleh firewall. File IPA tetap aman tersimpan di GitHub Artifacts & Releases."
             rm -f "$HOME/.ssh/id_ed25519"
             exit 0
           fi
 
-          # 1. Pastikan direktori tujuan di VPS sudah ada dan dapat ditulisi
           echo "Memeriksa dan membuat direktori target di VPS: $VPS_TARGET"
           ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
             "mkdir -p '$VPS_TARGET' 2>/dev/null || (sudo -n mkdir -p '$VPS_TARGET' && sudo -n chown -R $VPS_USER:$VPS_USER '$VPS_TARGET' && chmod 755 '$VPS_TARGET')" || true
 
-          # 2. Upload IPA via SCP
           echo "Mentransfer app-latest.ipa ke VPS..."
           if scp -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -P "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" app-latest.ipa "$VPS_USER@$VPS_HOST:$VPS_TARGET/app-latest.ipa"; then
             ssh -o BatchMode=yes -o ConnectTimeout=20 $STRICT_OPT -p "$TARGET_PORT" -i "$HOME/.ssh/id_ed25519" "$VPS_USER@$VPS_HOST" \
               "chmod 644 '$VPS_TARGET/app-latest.ipa'" || true
             echo "✓ iOS IPA berhasil ditransfer ke $VPS_TARGET/app-latest.ipa"
           else
-            echo "::warning::Transfer SCP IPA ke VPS gagal. File IPA tetap aman tersimpan di GitHub Artifacts."
+            echo "::warning::Transfer SCP IPA ke VPS gagal. File IPA tetap aman tersimpan di GitHub Artifacts & Releases."
           fi
 
           rm -f "$HOME/.ssh/id_ed25519"
+
+  # ==========================================
+  # 3. CREATE & PUBLISH GITHUB RELEASE
+  # ==========================================
+  create-release:
+    name: Publish to GitHub Releases
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: |
+      always() &&
+      (needs.build-android.result == 'success' || needs.build-ios.result == 'success') &&
+      (
+        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+        (github.event_name == 'workflow_dispatch' && (inputs.publish_release == true || inputs.publish_release == 'true')) ||
+        (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      )
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Determine Release Tag & Version
+        id: release_info
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            RAW_VER="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RAW_VER="${{ github.ref_name }}"
+          else
+            RAW_VER="v$(node -p "require('./package.json').version")"
+          fi
+
+          CLEAN_VER="${RAW_VER#v}"
+          TAG="v${CLEAN_VER}"
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${CLEAN_VER}" >> $GITHUB_OUTPUT
+          echo "title=${{ inputs.release_title || format('Life Planner {0}', 'TAG_PLACEHOLDER') }}" | sed "s/TAG_PLACEHOLDER/${TAG}/" >> $GITHUB_OUTPUT
+
+      - name: Create Release Assets Directory
+        run: mkdir -p release-assets
+
+      - name: Download Android APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: release-assets
+        continue-on-error: true
+
+      - name: Download iOS IPA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: release-assets
+        continue-on-error: true
+
+      - name: Inspect Collected Release Assets
+        run: |
+          echo "Files ready to publish into GitHub Release:"
+          ls -lh release-assets/ || true
+
+      - name: Generate Changelog and Bug Fix Notes
+        env:
+          CUSTOM_RELEASE_NOTES: ${{ inputs.release_notes }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          node scripts/generate-changelog.mjs "${{ steps.release_info.outputs.tag }}" "$CUSTOM_RELEASE_NOTES"
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag }}
+          name: ${{ steps.release_info.outputs.title }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          make_latest: "true"
+          generate_release_notes: true
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

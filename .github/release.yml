@@ -1,0 +1,22 @@
+changelog:
+  categories:
+    - title: "🐛 Perbaikan Bug & Stabilitas (Bug Fixes)"
+      labels:
+        - "bug"
+        - "fix"
+        - "hotfix"
+    - title: "🚀 Fitur Baru & Peningkatan (New Features)"
+      labels:
+        - "feature"
+        - "enhancement"
+        - "feat"
+    - title: "⚡ Optimasi & Performa (Performance)"
+      labels:
+        - "perf"
+        - "performance"
+    - title: "🔧 Pemeliharaan & Refaktor (Maintenance)"
+      labels:
+        - "refactor"
+        - "chore"
+        - "docs"
+        - "test"
